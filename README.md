@@ -12,7 +12,7 @@ goal of **79kg**.
 | File | What it is |
 |---|---|
 | `index.html` | The app (about 700 KB). Built from `src/` by `node build.mjs`. **Upload this.** |
-| `art/` | The 274 pictures (with Pavi's LUCK piece), written by the build: the AI-upscaled, twice-as-sharp versions from `art_hd/` where they exist, otherwise `art400/`. Since v17 they are separate files: the page opens about twice as fast and uses far less memory, and the phone keeps every picture after the first open. **Upload this folder** whenever the build changes it. |
+| `art/` | The 274 pictures (with Pavi's LUCK piece), written by the build: the AI-upscaled, twice-as-sharp versions from `art_hd/` where they exist, otherwise `art400/`. Since v17 they are separate files: the page opens about twice as fast and uses far less memory, and the phone keeps every picture after the first open. `art/t/` holds a grid-sized copy of each boss, weapon, hero and power (from `art_thumb/`), so the Bosses and Armoury tabs open without decoding 160 full-size pictures. **Upload this folder** whenever the build changes it. |
 | `sw.js` | Lets the app open with no signal, and keeps every picture on the phone. **Upload this too**, every time `index.html` changes. |
 | `manifest.json`, `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `zxing.min.js` | Home Screen icon, install details and the barcode reader. Upload once; they have not changed in V17PRO. |
 | `worker/worker.js` | The System: a Cloudflare Worker for Claude food logging, InBody photo reading, the food database, Apple Health inbox and the cloud copy. **Not changed in V17PRO.** |
