@@ -1037,6 +1037,27 @@ html:not(.light) .iconbtn,html:not(.light) .daypill{background:rgba(255,255,255,
 .lockic.lk::before{content:"";width:30px;height:30px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23cfe0f0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4.5' y='10.5' width='15' height='10' rx='2.5' fill='rgba(4,8,15,.9)'/%3E%3Cpath d='M8 10.5V7.5a4 4 0 0 1 8 0v3'/%3E%3Ccircle cx='12' cy='15.5' r='1.4' fill='%23cfe0f0'/%3E%3C/svg%3E") center/contain no-repeat}
 .lockic.gold.lk::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff3cf' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4.5' y='10.5' width='15' height='10' rx='2.5' fill='rgba(4,8,15,.9)'/%3E%3Cpath d='M8 10.5V7.5a4 4 0 0 1 8 0v3'/%3E%3Ccircle cx='12' cy='15.5' r='1.4' fill='%23fff3cf'/%3E%3C/svg%3E")}
 .slot .lockic.lk::before{width:24px;height:24px}
+
+/* ═════════ V17PRO: sheets always close — a ✕ pinned to the top, and swipe down ═════════ */
+.sheet-xw{position:sticky;top:0;height:0;z-index:6}
+.sheet-x{position:absolute;right:-11px;top:-9px;width:44px;height:44px;display:grid;place-items:center;border:0;border-radius:50%;padding:0;background:none;font:600 15px/1 var(--sans,inherit);color:var(--ink)}
+.sheet-x::before{content:"";position:absolute;inset:5px;z-index:-1;border-radius:50%;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 0 16px -6px rgba(var(--acc),.8)}
+.sheet-x{isolation:isolate} .sheet-x:active{transform:scale(.9)}
+.sheet .grab+.win-h,.sheet .sheet-xw~.win-h:first-of-type{padding-right:36px}
+html.light .sheet-x::before{background:rgba(255,255,255,.85);border-color:rgba(var(--acc-line),.25)}
+.sheet{max-height:86vh;max-height:86dvh}
+
+/* ═════════ V17PRO: a little more shine (all still, or moved by the graphics chip only) ═════════ */
+html:not(.light) .win:not(.last)::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:radial-gradient(160px 90px at 10% 0%,rgba(var(--acc-hi),.15),transparent 70%),radial-gradient(200px 120px at 100% 100%,rgba(var(--acc),.08),transparent 70%)}
+html:not(.light):not(.glass) .win{box-shadow:0 1px 0 rgba(255,255,255,.26) inset,0 -1px 0 rgba(0,0,0,.32) inset,0 0 0 1px rgba(var(--acc-line),.06),0 0 30px -16px rgba(var(--acc),.6),0 24px 54px -26px rgba(0,0,0,.95)}
+html:not(.light) .sec-h h2{filter:drop-shadow(0 0 10px rgba(var(--acc),.45))}
+html:not(.light) .plan3 b,html:not(.light) .ro b{text-shadow:0 0 14px color-mix(in srgb,currentColor 55%,transparent)}
+.btn.primary{position:relative;overflow:hidden;isolation:isolate}
+.btn.primary::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.55) 50%,transparent 65%);transform:translateX(-130%);animation:sheen 5.5s ease-in-out infinite}
+html:not(.light) .btn.primary{box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 10px 30px -10px rgba(var(--acc2),.95),0 0 22px -8px rgba(var(--acc-hi),.9)}
+@media (prefers-reduced-motion:reduce){.btn.primary::after{animation:none;display:none}}
+.calm .btn.primary::after{animation:none;display:none}
 </style>
 </head>
 <body>
@@ -4900,11 +4921,23 @@ function countUp(el, to) {
 function openLayer(html, opts) {
   opts = opts || {}; if (window.Aura && window.Aura.hold) window.Aura.hold(true); if (window.Puzzle) window.Puzzle.hold(true); // nothing animates behind a sheet
   var layer = $('#layer');
-  layer.innerHTML = '<div class="scrim' + (opts.center ? ' center-scrim' : '') + '" data-scrim="1">' + (opts.center ? '<div class="modal">' + html + '</div>' : '<div class="sheet win ' + (opts.cls || '') + '"><span class="br-b"></span>' + html + '</div>') + '</div>';
+  // V17PRO: every sheet has a ✕ that stays at the top while you scroll, and can be swiped down to close
+  var xb = opts.sticky ? '' : '<div class="sheet-xw"><button class="sheet-x" data-act="close" aria-label="Close">✕</button></div>';
+  layer.innerHTML = '<div class="scrim' + (opts.center ? ' center-scrim' : '') + '" data-scrim="1">' + (opts.center ? '<div class="modal">' + html + '</div>' : '<div class="sheet win ' + (opts.cls || '') + '">' + xb + '<span class="br-b"></span>' + html + '</div>') + '</div>';
   var scrim = $('.scrim', layer);
   scrim.addEventListener('click', function (e) { if (e.target === scrim && !opts.sticky) closeLayer(); });
-  var f = $('[autofocus]', layer); if (f) setTimeout(function () { f.focus(); }, 60);
+  if (!opts.center && !opts.sticky) swipeToClose($('.sheet', layer));
+  // on a phone the keyboard waits until you tap the box, so the sheet opens at its own size instead of filling the screen
+  var f = $('[autofocus]', layer); if (f && !TOUCH) setTimeout(function () { f.focus(); }, 60);
   return layer;
+}
+var TOUCH = !!(window.matchMedia && matchMedia('(pointer:coarse)').matches);
+/* drag the top of a sheet down to close it (only when the sheet is scrolled to its top) */
+function swipeToClose(sh) {
+  if (!sh) return; var y0 = null, dy = 0;
+  sh.addEventListener('touchstart', function (e) { if (sh.scrollTop > 0 || e.touches.length !== 1) { y0 = null; return; } var r = sh.getBoundingClientRect(); if (e.touches[0].clientY - r.top > 90) { y0 = null; return; } y0 = e.touches[0].clientY; dy = 0; sh.style.transition = 'none'; }, { passive: true });
+  sh.addEventListener('touchmove', function (e) { if (y0 == null) return; dy = Math.max(0, e.touches[0].clientY - y0); sh.style.transform = dy ? 'translateY(' + dy + 'px)' : ''; }, { passive: true });
+  sh.addEventListener('touchend', function () { if (y0 == null) return; y0 = null; sh.style.transition = 'transform .25s var(--spring)'; if (dy > 90) { sh.style.transform = 'translateY(110%)'; setTimeout(closeLayer, 180); } else sh.style.transform = ''; });
 }
 function closeLayer() { stopScanner(); $('#layer').innerHTML = ''; if (window.Aura && window.Aura.hold) window.Aura.hold(false); if (window.Puzzle) window.Puzzle.hold(false); pending = null; pendingScan = null; portionState = null; setTimeout(nextInbox, 450); }
 function confirmBox(title, msg, okLabel, onOk, danger) {
@@ -6146,7 +6179,7 @@ function planCardHTML(k) {
   var status = ps.state === 'none' ? '<span class="dim">Weigh in on 2+ mornings to see your 7-day average</span>' : ps.state === 'ahead' ? '<span class="good">' + n1(-ps.diff) + 'kg ahead of plan</span>' : ps.state === 'on' ? '<span class="good">On plan</span>' : '<span class="warnc">' + n1(ps.diff) + 'kg behind plan</span>';
   return '<button class="win plancard lift" style="--c:var(--train)" data-act="plan"><div class="win-h"><div class="win-t">WINTER ARC</div><div class="win-s">Week ' + w.week + ' of ' + w.total + (R.isDeload(S, k) ? ' · deload' : '') + '</div></div>' +
     '<div class="bar" style="--c:var(--train)"><i style="width:' + pct + '%"></i></div>' +
-    '<div class="plan3"><div><span>7-day average</span><b style="color:var(--holo)">' + fmtKg(ps.avg) + '</b></div><div><span>Plan average</span><b>' + fmtKg(ps.planAvg != null ? ps.planAvg : ps.plan) + '</b></div><div><span>' + (next ? 'Next: ' + R.fmtDate(next.date).slice(4) : 'Finish') + '</span><b style="color:var(--kcal)">' + (next ? fmtKg(next.kg) : fmtKg(S.profile.goalKg)) + '</b></div></div>' +
+    '<div class="plan3"><div><span>Current weight</span><b style="color:var(--holo)">' + fmtKg(R.latestWeight(S, k)) + '</b></div><div><span>Plan today</span><b>' + fmtKg(ps.plan) + '</b></div><div><span>' + (next ? 'Next: ' + R.fmtDate(next.date).slice(4) : 'Finish') + '</span><b style="color:var(--kcal)">' + (next ? fmtKg(next.kg) : fmtKg(S.profile.goalKg)) + '</b></div></div>' +
     '<div class="row between" style="margin-top:8px;font-size:13px"><span id="plan-status">' + status + '</span><span class="holo">Open plan ›</span></div></button>';
 }
 /* ── the days before the arc ── */
