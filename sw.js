@@ -1,5 +1,5 @@
 /* Winter Arc service worker — offline app shell. Never caches the System (Cloudflare Worker) API. */
-const VERSION = 'rtl-v16', ART = 'rtl-art-2', MINE = 'rtl-';
+const VERSION = 'rtl-v17', ART = 'rtl-art-3', MINE = 'rtl-';
 const PAGE = './index.html', REST = ['./zxing.min.js', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 const END = '<!--winter-arc:end-->'; // the build writes this as the very last thing in the app page
 const scopePath = () => new URL(self.registration.scope).pathname;
@@ -38,7 +38,7 @@ self.addEventListener('fetch', e => {
     e.respondWith(caches.open(VERSION).then(c => c.match(PAGE)).then(hit => hit || fresh));
     return;
   }
-  if (sameOrigin && url.pathname.includes('/art/')) { // boss and weapon art: kept on the device once seen, across app updates
+  if (sameOrigin && url.pathname.includes('/art/')) { // every picture: kept on the device once fetched, across app updates (each address names its own version)
     e.respondWith(caches.open(ART).then(c => c.match(req).then(hit => hit || fetch(req).then(r => { if (r && r.ok) c.put(req, r.clone()); return r; }))));
     return;
   }
