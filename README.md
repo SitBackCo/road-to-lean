@@ -4,7 +4,7 @@ Pavi's levelling fitness tracker. Type what you ate or trained and Claude turns 
 quests, XP, ranks, bosses and secret heroes, and every day of the arc a different character from Pavi's own anime art
 stands on Home and in the Body tab, wrapped in a blazing aura of their own colour.
 
-**Version 15 · data version 9.** The arc runs **Thu 8 Oct 2026 to Thu 31 Dec 2026** (85 days), from **90.5kg** to a
+**Version 16 · data version 10.** The arc runs **Thu 8 Oct 2026 to Thu 31 Dec 2026** (85 days), from **90.5kg** to a
 goal of **79kg**.
 
 **The whole app is one file: `index.html`.** The rest of this folder is its source and its tests.
@@ -13,8 +13,8 @@ goal of **79kg**.
 |---|---|
 | `index.html` | The app. Built from `src/` by `node build.mjs`. **Upload this.** |
 | `sw.js` | Lets the app open with no signal. **Upload this too**, every time `index.html` changes. |
-| `manifest.json`, `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `zxing.min.js` | Home Screen icon, install details and the barcode reader. Upload once; they have not changed in v15. |
-| `worker/worker.js` | The System: a Cloudflare Worker for Claude food logging, InBody photo reading, the food database, Apple Health inbox and the cloud copy. **Not changed in v15.** |
+| `manifest.json`, `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `zxing.min.js` | Home Screen icon, install details and the barcode reader. Upload once; they have not changed in v16. |
+| `worker/worker.js` | The System: a Cloudflare Worker for Claude food logging, InBody photo reading, the food database, Apple Health inbox and the cloud copy. **Not changed in v16.** |
 | `hosted/winter-arc.html` | The same app built to live inside Claude (no GitHub, no Cloudflare). |
 | `src/` | Source: `core.js` (every rule), `app.js` (screens), `aura.js` (today's character and their aura), `hosted.js`, `styles.css`, `tests.js`, `index.src.html`. |
 | `art400/` | The 273 pictures built into the page (83 bosses, 83 weapons, 11 heroes, 11 powers, and in `art400/a/` the 85 daily characters, numbered as in Pavi's list). `art400/unused/` holds the 14 that belonged to the seven bosses removed in v14. |
@@ -38,7 +38,10 @@ Cloudflare account and in the storage of the device you type them into.
 | Reviews | Every 14 days: 22 Oct, 5 Nov, 19 Nov, 3 Dec, 17 Dec. 0.6 to 0.9kg a week: change nothing. Over 1.1kg: +150 kcal. 0.3 to 0.5kg: −100 kcal or +1,500 steps. Under 0.3kg: −150 kcal and +1,500 steps |
 | Daily bosses | 83, one a day from 8 Oct. Each can be beaten on the day it arrives or the day after. The last arrives on 29 Dec and can still be beaten on 30 Dec. 31 Dec has no boss |
 | Today's character | 85 characters, one a day from 8 Oct to 31 Dec, each exactly once, in an order drawn at random for your save (see below) |
-| Secret heroes | 11 weeks, Thursday to Wednesday, 8 Oct to 23 Dec. One weigh-in in the week at least 0.85kg under the last weigh-in before that week began frees the next hero (week 1 is measured from 90.5kg) |
+| Secret heroes | One for every whole kg your 7-day average weight (at least two weigh-ins) drops below 90.5kg, so 89.5kg frees the first and 79.5kg the eleventh. A freed hero stays freed; correcting a mistyped weigh-in re-works them. Heroes won under the old weekly rule (before v16) are kept |
+| Penalty Quests | Gone from v16. A missed Daily Clear just ends the streak. Penalty Quests already done keep their XP |
+| Look | ⚙️ → Look: your own profile picture (from Photos, cropped to a circle) and eight colour themes |
+| Aura tab | Today's character large, and a collection of every character met so far (none still to come). Awards are now in Stats |
 
 Nothing logged before 8 Oct or after 31 Dec earns XP, streaks, awards, bosses or heroes. It is still saved.
 
@@ -54,7 +57,7 @@ Nothing logged before 8 Oct or after 31 Dec earns XP, streaks, awards, bosses or
 
 ## 2. The Cloudflare Worker (the System)
 
-If your Worker already runs the current `worker.js` you do not need to touch it for v15. To check: open the app →
+If your Worker already runs the current `worker.js` you do not need to touch it for v16. To check: open the app →
 ⚙️ → **Test connection**. If no line mentions "an older version", it is current.
 
 Setting it up from nothing:
@@ -85,8 +88,8 @@ Set a monthly spend limit at console.anthropic.com. Each food log is one short C
 3. ⚙️ → **Diagnostics**: every line should say PASS (two of them check today's character and all 85 pictures).
 
 **Updating an iPhone that already has the app:** open it with signal, wait ten seconds, close it fully (swipe it
-away), open it again. ⚙️ should now end with "Winter Arc v15 · data v9". Your logs are never removed by an update, and
-nothing about your save changes in v15.
+away), open it again. ⚙️ should now end with "Winter Arc v16 · data v10". Your logs are never removed by an update. v16 only adds to your save: a place for
+your profile picture, your theme, and the date Penalty Quests stopped.
 
 ## 4. On a laptop
 
