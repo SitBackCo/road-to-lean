@@ -1,5 +1,5 @@
 /* Winter Arc service worker — offline app shell. Never caches the System (Cloudflare Worker) API. */
-const VERSION = 'rtl-v17', ART = 'rtl-art-3', MINE = 'rtl-';
+const VERSION = 'rtl-v17pro', ART = 'rtl-art-3', MINE = 'rtl-';
 const PAGE = './index.html', REST = ['./zxing.min.js', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 const END = '<!--winter-arc:end-->'; // the build writes this as the very last thing in the app page
 const scopePath = () => new URL(self.registration.scope).pathname;
