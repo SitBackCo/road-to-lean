@@ -1,74 +1,32 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   WINTER ARC — Cloudflare Worker
-   • POST /parse   → sends your text to Claude, returns Claude's JSON reply
+   ASCEND — Cloudflare Worker
    • GET  /sync    → returns your cloud copy (needs the SYNC KV binding); /sync?meta=1 returns only its details
    • PUT  /sync    → saves your cloud copy (refuses to overwrite a newer one; keeps earlier versions)
    • GET  /sync/versions, /sync/version?key=… → the earlier versions you can restore
-   • POST /scan    → Claude reads InBody screenshots, returns the numbers as JSON
+   • POST /scan    → Claude reads InBody screenshots, returns the numbers as JSON (the only paid route)
    • POST /inbox   → your iPhone Shortcut drops Apple Health body data here (needs SYNC)
    • GET  /inbox   → the app collects it; POST /inbox/ack removes confirmed items
-   • GET  /food/search?q=  → food database search (Open Food Facts, UK products first)
-   • GET  /food/barcode/:code → product by barcode
-   • POST /food/label      → Claude reads a nutrition-label photo
-   • POST /food/web        → Claude finds exact figures online (needs web search enabled in Console)
+   • GET  /food/search?q=  → food search across FatSecret (UK), the UK government database (CoFID) and Open Food Facts
+   • GET  /food/barcode/:code → product by barcode (Open Food Facts)
    • GET  /health  → shows what's configured
-   Secrets (Settings → Variables and Secrets):
-     ANTHROPIC_API_KEY  your Claude API key            (secret)
+   Food logging no longer uses Claude: /parse, /food/label and /food/web answer 410 (gone).
+   Secrets (Settings → Variables and Secrets) — never written in this file:
      APP_KEY            a long passcode you choose      (secret) — typed once into the app
+     FATSECRET_ID       FatSecret Platform API Client ID      (secret)
+     FATSECRET_SECRET   FatSecret Platform API Client Secret  (secret)
+     COFID_KEY          optional: a CoFID API key from the Quadram Institute (secret)
+     ANTHROPIC_API_KEY  only for reading InBody screenshots   (secret)
    Optional variables:
      ALLOWED_ORIGINS    default https://sitbackco.github.io
      MODEL              default claude-haiku-4-5-20251001
-     LIMIT_PARSE, LIMIT_SCAN, LIMIT_LABEL, LIMIT_WEB   daily ceilings (defaults 120, 12, 30, 8)
+     LIMIT_SCAN         daily ceiling for InBody reads (default 12)
    Optional binding:
      SYNC               a KV namespace for cloud backup
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 const DEFAULT_ORIGINS = 'https://sitbackco.github.io';
-const MAX_TEXT = 1200;
 const MAX_SYNC_BYTES = 5 * 1024 * 1024;
-const AI_TIMEOUT_MS = 14000;
-
-export const SYSTEM_PROMPT = `You are the logging engine inside "Winter Arc", a UK fitness tracker. The user types what they ate, trained, did, measured or drank. Convert it into JSON for the app.
-
-Reply with ONE JSON object and nothing else — no prose, no markdown fences.
-
-Shape:
-{"type":"food"|"training"|"activity"|"body"|"water"|"mixed"|"unknown","items":[...],"message":"only when type is unknown: a short hint"}
-Use "mixed" when the message contains more than one kind. Every item has a "kind".
-
-FOOD item:
-{"kind":"food","name":"Vegetable samosa","quantity":"2 medium (~100g each)","meal":null,"calories":520,"protein_g":10,"carbs_g":52,"sugar_g":3,"fat_g":30,"fibre_g":5,"confidence":"medium","assumption":"2 medium deep-fried veg samosas"}
-- One item per distinct food. Multiples go in one item (quantity "2").
-- Numbers only (no strings, no ranges). Round calories to whole numbers, grams to 1 decimal.
-- UK portions and UK products by default (Tesco, Sainsbury's, Greggs, Nando's, McDonald's UK, etc.). Use the brand's published values when a brand is named.
-- The user often eats South Asian / Sri Lankan Tamil home food (rice and curry, dhal, string hoppers, dosa, kothu, samosa, bhaji, pakora). Estimate typical home portions honestly — do not lowball fried food.
-- If the user gives weights, use them exactly. If the user gives their own macros, use them.
-- "meal" is "breakfast"/"lunch"/"dinner"/"snack" only if the user says so, otherwise null.
-- confidence: "high" ONLY when the user gave the weight or their own macros, or the food is in the user's own foods list in the context. Brand or restaurant figures you are recalling from memory are "medium" at most, because menus and recipes change. "medium" for typical portions, "low" for vague descriptions. assumption: one short sentence on the portion you assumed.
-- Sugar must not exceed carbs. protein*4 + carbs*4 + fat*9 should roughly match calories.
-- The user is lactose intolerant and uses whey ISOLATE. Their "protein bowl" = 250g fat-free Greek yogurt + 65g whey isolate.
-
-TRAINING item (one per exercise):
-{"kind":"exercise","name":"Lat pulldown","sets":[{"kg":60,"reps":10},{"kg":60,"reps":10},{"kg":60,"reps":10}]}
-- Expand "3x10 at 60kg" into 3 set objects. Bodyweight moves (push-ups, pull-ups, dips) use kg 0 unless weight is added.
-- Convert lb to kg (÷2.2046). Keep the exercise name the user used.
-
-ACTIVITY item:
-{"kind":"activity","type":"steps","steps":11400}
-{"kind":"activity","type":"football","minutes":60,"kcal":null}
-- type is one of: steps, gym, football, cardio, sprint, ballwork, abs, other. "gym done"/"trained" with no details = gym, 60 minutes. Incline walk/run/cycle = cardio. Sprints = sprint. Ball drills/wall passes/skills = ballwork. A home abs or core session (planks, crunches, leg raises) = abs.
-- kcal only if the user states it, otherwise null.
-
-BODY item (only the fields given):
-{"kind":"body","weight_kg":88.6,"body_fat_pct":null,"waist_cm":96}
-- "weighed 88.6" = weight_kg. Convert stone/lb to kg, inches to cm. Allowed fields: weight_kg, body_fat_pct, waist_cm, chest_cm, shoulders_cm, arms_cm.
-
-WATER item:
-{"kind":"water","ml":750}
-- 1 glass = 250ml, 1 bottle = 500ml unless stated, litres ×1000.
-
-If nothing is loggable, reply {"type":"unknown","items":[],"message":"..."}.`;
 
 export const SCAN_PROMPT = `You read screenshots from the InBody app (body composition scans) and return the numbers as JSON. Reply with ONE JSON object and nothing else.
 
@@ -84,22 +42,7 @@ Rules:
 - Segmental Analysis, Soft Lean Mass tab: the kg values go in segmental_lean_kg and the percentages (e.g. 115.2%) in segmental_lean_pct. Do not use the Fat tab values for these.
 - If the images are not InBody results, reply {"found":false,"message":"short reason"}.`;
 
-export const LABEL_PROMPT = `You read a photo of a UK food nutrition label and return JSON only. Reply with ONE JSON object and nothing else.
-{"found":true,"name":null,"brand":null,"barcode":null,"per100":{"kcal":0,"protein_g":0,"carbs_g":0,"sugar_g":0,"fat_g":0,"fibre_g":0},"serving_g":null,"serving_label":null,"per_serving":null}
-- per100 is the "per 100g" (or per 100ml) column. per_serving is the per-portion column if the label has one, with serving_g and serving_label (e.g. "1 bar (60g)").
-- Use kcal, never kJ. Copy the numbers exactly. Use null for anything not visible. Never estimate.
-- "of which sugars" is sugar_g. "Fibre" is fibre_g. Name, brand and the barcode digits only if they're visible.
-- If this isn't a nutrition label, reply {"found":false,"message":"short reason"}.`;
-
-export const WEB_PROMPT = `You find exact nutrition information for UK foods using web search. The user names a food: a branded product, a supermarket item, or a restaurant or café item.
-Search official sources first: the brand's or restaurant's own UK website, then UK supermarket product pages (Tesco, Sainsbury's, Asda, Morrisons, Ocado, Waitrose), then reputable nutrition databases.
-Finish with ONE JSON object as the very last thing in your reply:
-{"found":true,"name":"...","brand":"...","serving_label":"1 roll","serving_g":null,"per_serving":{"kcal":0,"protein_g":0,"carbs_g":0,"sugar_g":0,"fat_g":0,"fibre_g":0},"per100":null,"source_url":"https://...","source_title":"..."}
-- per_serving is ONE serving exactly as the source lists it (one roll, one wrap, one bar). Do not scale it to the user's amount.
-- Include per100 only if the source lists per-100g values. Use kcal, not kJ. Use the UK version of the product or menu.
-- If you can't find reliable figures, reply {"found":false,"message":"short reason"}. Never invent or estimate numbers.`;
-
-const OFF_UA = 'WinterArc/1.0 (personal fitness tracker)';
+const OFF_UA = 'Ascend/1.0 (personal fitness tracker)';
 const OFF_FIELDS = 'code,product_name,product_name_en,generic_name,brands,nutriments,serving_size,serving_quantity,countries_tags,quantity';
 function offNum(v) { const x = typeof v === 'number' ? v : parseFloat(v); return Number.isFinite(x) ? x : null; }
 /* Open Food Facts product → compact food (per 100g + serving). Returns null if there are no usable calories. */
@@ -129,9 +72,7 @@ async function offFetch(url) {
   if (cache) { try { await cache.put(key, new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' } })); } catch (e) {} }
   return data;
 }
-async function handleFoodSearch(url, cors) {
-  const q = String(url.searchParams.get('q') || '').trim().slice(0, 80);
-  if (q.length < 2) return json({ ok: false, error: 'Type at least 2 letters.' }, 400, cors);
+async function offSearch(q) {
   let list = null, lastErr = null;
   try {
     const d = await offFetch('https://search.openfoodfacts.org/search?q=' + encodeURIComponent(q) + '&page_size=30&langs=en&fields=' + OFF_FIELDS);
@@ -143,11 +84,98 @@ async function handleFoodSearch(url, cors) {
       if (d && Array.isArray(d.products)) list = d.products;
     } catch (e) { lastErr = e; }
   }
-  if (!list) return json({ ok: false, error: lastErr && lastErr.status === 429 ? 'The food database is busy. Try again in a minute.' : 'Couldn’t reach the food database.' }, 502, cors);
+  if (!list) throw new Error(lastErr && lastErr.status === 429 ? 'Open Food Facts is busy' : 'Open Food Facts unreachable');
   const seen = {}, items = [];
   list.map(offCompact).filter(Boolean).forEach(x => { const k = x.code || (x.name + '|' + x.brand).toLowerCase(); if (!seen[k]) { seen[k] = 1; items.push(x); } });
   items.sort((a, b) => (b.uk ? 1 : 0) - (a.uk ? 1 : 0));
-  return json({ ok: true, items: items.slice(0, 20) }, 200, cors);
+  return items.slice(0, 12);
+}
+
+/* ── FatSecret Platform API: 2.3 million foods incl. UK restaurant chains. Signs in with the two secrets (OAuth 2 client
+   credentials), keeps the token until it expires, and asks for UK results (a Premier plan feature: on the free Basic plan it
+   quietly searches without the region). FatSecret only answers from addresses approved in your account: if it refuses, the
+   reply says which address to approve. ── */
+const FS_TOKEN_URL = 'https://oauth.fatsecret.com/connect/token', FS_API = 'https://platform.fatsecret.com/rest/server.api';
+let FS_TOKEN = null, FS_REGION = true;
+export function _resetFatSecret() { FS_TOKEN = null; FS_REGION = true; }
+const b64 = s => (typeof btoa === 'function' ? btoa(s) : Buffer.from(s).toString('base64'));
+function fsError(j, status) {
+  const e = j && j.error, code = e && (e.code != null ? Number(e.code) : null), msg = String(e && (e.message || e) || ('FatSecret error ' + status));
+  const ip = /(\d{1,3}(?:\.\d{1,3}){3}|[0-9a-f:]{6,})/i.exec(msg);
+  if (code === 21 || /ip address/i.test(msg)) return 'FatSecret refused this Worker’s address' + (ip ? ' (' + ip[1] + ')' : '') + '. Approve it under IP Restrictions in your FatSecret account.';
+  if (code === 2 || code === 13 || /invalid_client|credential|token/i.test(msg)) return 'FatSecret didn’t accept the Client ID or Secret. Check FATSECRET_ID and FATSECRET_SECRET in Cloudflare.';
+  if (code === 22 || /quota|limit/i.test(msg)) return 'FatSecret’s daily limit is used up. It resets tomorrow.';
+  return 'FatSecret: ' + msg.slice(0, 160);
+}
+async function fsToken(env) {
+  if (FS_TOKEN && FS_TOKEN.exp > Date.now() + 60000) return FS_TOKEN.t;
+  const res = await fetch(FS_TOKEN_URL, { method: 'POST', headers: { 'Authorization': 'Basic ' + b64(env.FATSECRET_ID + ':' + env.FATSECRET_SECRET), 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'grant_type=client_credentials&scope=basic' });
+  let j = null; try { j = await res.json(); } catch (e) {}
+  if (!res.ok || !j || !j.access_token) throw new Error(fsError(j && j.error ? { error: { message: j.error_description || j.error } } : j, res.status));
+  FS_TOKEN = { t: j.access_token, exp: Date.now() + Math.max(300, Number(j.expires_in) || 86400) * 1000 };
+  return FS_TOKEN.t;
+}
+const r1w = x => Math.round(x * 10) / 10;
+/* one FatSecret search result → a compact food. Its description reads "Per 1 wing - Calories: 91kcal | Fat: 6.20g | Carbs: 3.80g | Protein: 4.90g". */
+export function fsCompact(f) {
+  if (!f || typeof f !== 'object') return null;
+  const m = /^Per\s+(.+?)\s+-\s+Calories:\s*([\d.]+)\s*kcal\s*\|\s*Fat:\s*([\d.]+)\s*g\s*\|\s*Carbs:\s*([\d.]+)\s*g\s*\|\s*Protein:\s*([\d.]+)\s*g/i.exec(String(f.food_description || ''));
+  const name = String(f.food_name || '').trim();
+  if (!m || !name) return null;
+  const label = m[1].trim(), mac = { kcal: Math.round(+m[2]), protein_g: r1w(+m[5]), carbs_g: r1w(+m[4]), sugar_g: 0, fat_g: r1w(+m[3]), fibre_g: 0 };
+  if (!(mac.kcal >= 0 && mac.kcal < 5000)) return null;
+  const is100 = /^100\s*g$/i.test(label), gm = /(\d+(?:\.\d+)?)\s*g\b/i.exec(label), g = gm ? +gm[1] : null;
+  const per100 = is100 ? mac : g && g > 0 && g <= 3000 ? { kcal: Math.round(mac.kcal * 100 / g), protein_g: r1w(mac.protein_g * 100 / g), carbs_g: r1w(mac.carbs_g * 100 / g), sugar_g: 0, fat_g: r1w(mac.fat_g * 100 / g), fibre_g: 0 } : null;
+  if (per100 && per100.kcal > 950) return null;
+  return { id: 'fs-' + String(f.food_id || '').replace(/\D/g, '').slice(0, 20), code: '', name: name.slice(0, 80), brand: String(f.brand_name || '').trim().slice(0, 60), source: 'fatsecret',
+    per100, serving: is100 ? null : Object.assign({ label: label.slice(0, 40), g: g && g <= 3000 ? g : null }, mac), uk: true };
+}
+async function fatSecretSearch(env, q) {
+  if (!env.FATSECRET_ID || !env.FATSECRET_SECRET) return { status: 'not set up', items: [] };
+  const token = await fsToken(env);
+  const call = async region => {
+    const res = await fetch(FS_API + '?method=foods.search&format=json&max_results=20&search_expression=' + encodeURIComponent(q) + (region ? '&region=GB&language=en' : ''), { headers: { 'Authorization': 'Bearer ' + token } });
+    let j = null; try { j = await res.json(); } catch (e) {}
+    return { res, j };
+  };
+  let r = await call(FS_REGION);
+  if (FS_REGION && (!r.res.ok || (r.j && r.j.error)) && !(r.j && r.j.error && Number(r.j.error.code) === 21)) { FS_REGION = false; r = await call(false); }
+  if (!r.res.ok || !r.j || r.j.error) { if (r.res.status === 401) FS_TOKEN = null; throw new Error(fsError(r.j, r.res.status)); }
+  const list = r.j.foods && r.j.foods.food, arr = Array.isArray(list) ? list : list ? [list] : [];
+  return { status: 'ok', items: arr.map(fsCompact).filter(Boolean) };
+}
+
+/* ── CoFID: the UK government's McCance & Widdowson food database (Quadram Institute API). Optional: works once a COFID_KEY
+   secret is added (request one from fn-nbri@quadram.ac.uk). ── */
+const COFID_API = 'https://api.cofid.quadram.ac.uk/api/v1/foods';
+export function cofidCompact(d) {
+  if (!d || typeof d !== 'object') return null;
+  const p = d.proximates || {}, n = v => v === 'Tr' || v === 'tr' ? 0 : v == null || v === '' || !Number.isFinite(+v) ? null : r1w(+v);
+  const kcal = n(p.energy_kcal), name = String(d.food_name || '').trim();
+  if (kcal == null || kcal < 0 || kcal > 950 || !name) return null;
+  return { id: 'cofid-' + String(d.food_code || '').replace(/[^0-9A-Za-z-]/g, '').slice(0, 12), code: '', name: name.slice(0, 80), brand: '', source: 'cofid',
+    per100: { kcal: Math.round(kcal), protein_g: n(p.protein) || 0, carbs_g: n(p.carbohydrate) || 0, sugar_g: n(p.total_sugars != null ? p.total_sugars : p.sugars) || 0, fat_g: n(p.fat) || 0, fibre_g: n(p.fibre != null ? p.fibre : p.aoac_fibre) || 0 }, serving: null, uk: true };
+}
+async function cofidSearch(env, q) {
+  if (!env.COFID_KEY) return { status: 'not set up', items: [] };
+  const h = { 'X-API-Key': env.COFID_KEY, 'Accept': 'application/json' };
+  const s = await fetch(COFID_API + '/search?q=' + encodeURIComponent(q) + '&limit=6', { headers: h });
+  if (!s.ok) throw new Error(s.status === 403 ? 'CoFID didn’t accept COFID_KEY.' : s.status === 429 ? 'CoFID’s daily limit is used up.' : 'CoFID error ' + s.status);
+  const j = await s.json(), hits = (j && Array.isArray(j.results) ? j.results : []).slice(0, 6);
+  const det = await Promise.all(hits.map(r => fetch(COFID_API + '/' + encodeURIComponent(r.food_code), { headers: h }).then(x => x.ok ? x.json() : null).catch(() => null)));
+  return { status: 'ok', items: det.map(cofidCompact).filter(Boolean) };
+}
+
+/* every online source at once; whichever answer, the app gets them, UK government data first, then FatSecret, then Open Food Facts */
+async function handleFoodSearch(url, env, cors) {
+  const q = String(url.searchParams.get('q') || '').trim().slice(0, 80);
+  if (q.length < 2) return json({ ok: false, error: 'Type at least 2 letters.' }, 400, cors);
+  const [co, fs, off] = await Promise.allSettled([cofidSearch(env, q), fatSecretSearch(env, q), offSearch(q)]);
+  const status = r => r.status === 'fulfilled' ? (r.value && r.value.status) || 'ok' : String(r.reason && r.reason.message || r.reason);
+  const sources = { cofid: status(co), fatsecret: status(fs), off: off.status === 'fulfilled' ? 'ok' : status(off) };
+  const items = [].concat(co.status === 'fulfilled' ? co.value.items.slice(0, 5) : [], fs.status === 'fulfilled' ? fs.value.items.slice(0, 12) : [], off.status === 'fulfilled' ? off.value : []);
+  if (!items.length && [co, fs, off].every(r => r.status === 'rejected' || (r.value && r.value.status === 'not set up'))) return json({ ok: false, error: 'Couldn’t reach the food databases.', sources }, 502, cors);
+  return json({ ok: true, items: items.slice(0, 24), sources }, 200, cors);
 }
 async function handleBarcode(code, cors) {
   code = String(code || '').replace(/\D/g, '');
@@ -158,24 +186,6 @@ async function handleBarcode(code, cors) {
   const item = d && d.status === 1 ? offCompact(Object.assign({ code }, d.product)) : null;
   return json(item ? { ok: true, found: true, item } : { ok: true, found: false }, 200, cors);
 }
-async function handleLabel(req, env, cors) {
-  if (!env.ANTHROPIC_API_KEY) return json({ ok: false, error: 'ANTHROPIC_API_KEY is not set on the worker.' }, 500, cors);
-  let body; try { body = await req.json(); } catch (e) { return json({ ok: false, error: 'Bad request body.' }, 400, cors); }
-  const im = body && body.image, mt = String(im && im.media_type || ''), data = String(im && im.data || '');
-  if (!/^image\/(jpeg|png|webp|gif)$/.test(mt) || !data || data.length > MAX_IMAGE_B64 || !/^[A-Za-z0-9+/=]+$/.test(data.slice(0, 200))) return json({ ok: false, error: 'Send one JPEG or PNG photo of the label.' }, 400, cors);
-  const u = await spend(env, 'label'); if (!u.ok) return overLimit('label', u, cors);
-  return callClaude(env, cors, LABEL_PROMPT, [{ type: 'image', source: { type: 'base64', media_type: mt, data } }, { type: 'text', text: 'Read this nutrition label.' + (body.barcode ? ' Barcode scanned: ' + String(body.barcode).replace(/\D/g, '').slice(0, 14) : '') }], 30000, 800);
-}
-async function handleWeb(req, env, cors) {
-  if (!env.ANTHROPIC_API_KEY) return json({ ok: false, error: 'ANTHROPIC_API_KEY is not set on the worker.' }, 500, cors);
-  let body; try { body = await req.json(); } catch (e) { return json({ ok: false, error: 'Bad request body.' }, 400, cors); }
-  const q = String(body && body.query || '').trim();
-  if (q.length < 2 || q.length > 200) return json({ ok: false, error: 'Describe the food in 2–200 characters.' }, 400, cors);
-  const u = await spend(env, 'web'); if (!u.ok) return overLimit('web', u, cors);
-  const tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3, user_location: { type: 'approximate', country: 'GB', timezone: 'Europe/London' } }];
-  return callClaude(env, cors, WEB_PROMPT, [{ type: 'text', text: 'Find the nutrition for: ' + q }], 55000, 1500, { tools, model: env.WEB_MODEL || 'claude-sonnet-5-5', afterSearch: true });
-}
-
 function corsHeaders(origin, env) {
   const allowed = String(env.ALLOWED_ORIGINS || DEFAULT_ORIGINS).split(',').map(s => s.trim()).filter(Boolean);
   const ok = origin && (allowed.includes(origin) || allowed.includes('*') ||
@@ -201,8 +211,8 @@ function json(body, status, cors) {
    Paid routes: each has a daily ceiling so a loop or a stolen passcode cannot run up a bill. One small KV write per paid call. */
 const LOCK_AFTER = 10, LOCK_WINDOW_MS = 10 * 60 * 1000, LOCK_SECS = 15 * 60;
 const FAILS = new Map(), LOCKS = new Map(), USED = new Map();
-const DAILY = { parse: 120, scan: 12, label: 30, web: 8 };
-const KIND_NAME = { parse: 'text logs', scan: 'InBody screenshot reads', label: 'label photo reads', web: 'web lookups' };
+const DAILY = { scan: 12 };
+const KIND_NAME = { scan: 'InBody screenshot reads' };
 export function _resetLimits() { FAILS.clear(); LOCKS.clear(); USED.clear(); }
 const ipOf = req => cleanTok(req.headers.get('CF-Connecting-IP') || 'unknown', 45) || 'unknown';
 async function lockedOut(env, ip) {
@@ -238,44 +248,6 @@ function safeEqual(a, b) {
   return diff === 0;
 }
 
-async function handleParse(req, env, cors) {
-  if (!env.ANTHROPIC_API_KEY) return json({ ok: false, error: 'ANTHROPIC_API_KEY is not set on the worker.' }, 500, cors);
-  let body;
-  try { body = await req.json(); } catch (e) { return json({ ok: false, error: 'Bad request body.' }, 400, cors); }
-  const text = String((body && body.text) || '').trim();
-  if (!text) return json({ ok: false, error: 'Nothing to log.' }, 400, cors);
-  if (text.length > MAX_TEXT) return json({ ok: false, error: 'Message too long (max ' + MAX_TEXT + ' characters).' }, 400, cors);
-  const u = await spend(env, 'parse'); if (!u.ok) return overLimit('parse', u, cors);
-  let ctx = 'Context: today is ' + String(body.today || '').slice(0, 10) + ', time ' + String(body.time || '').slice(0, 5) + ' (UK), day type ' + String(body.dayType || '').slice(0, 10) + '.';
-  if (Array.isArray(body.known) && body.known.length) {
-    const lines = body.known.slice(0, 25).map(k => k && typeof k === 'object' ? '- ' + String(k.name).slice(0, 60) + ' | ' + String(k.qty || '').slice(0, 30) + ' | ' + [k.cal, k.p, k.c, k.s, k.f, k.fib].map(Number).map(x => Number.isFinite(x) ? x : 0).join('/') : '').filter(Boolean).join('\n');
-    ctx += '\nThe user\'s own foods (name | portion | kcal/protein/carbs/sugar/fat/fibre). When the message mentions one of these, use these exact values, scaled to the amount they ate, with confidence "high":\n' + lines.slice(0, 3000);
-  }
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), AI_TIMEOUT_MS);
-  let res;
-  try {
-    res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST', signal: ctrl.signal,
-      headers: { 'content-type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: env.MODEL || DEFAULT_MODEL, max_tokens: 1500, temperature: 0, system: SYSTEM_PROMPT, messages: [{ role: 'user', content: ctx + '\n\nUser: ' + text }] })
-    });
-  } catch (e) {
-    clearTimeout(timer);
-    return json({ ok: false, error: e && e.name === 'AbortError' ? 'The System took too long.' : 'The System could not reach its AI.' }, 504, cors);
-  }
-  clearTimeout(timer);
-  let data = null;
-  try { data = await res.json(); } catch (e) { /* fall through */ }
-  if (!res.ok) {
-    const msg = data && data.error && data.error.message ? data.error.message : ('AI error ' + res.status);
-    return json({ ok: false, error: msg }, 502, cors);
-  }
-  const out = data && Array.isArray(data.content) ? data.content.filter(c => c.type === 'text').map(c => c.text).join('') : '';
-  if (!out) return json({ ok: false, error: 'The System got an empty reply.' }, 502, cors);
-  return json({ ok: true, text: out, model: data.model || env.MODEL || DEFAULT_MODEL }, 200, cors);
-}
-
 const MAX_IMAGES = 4, MAX_IMAGE_B64 = 5 * 1024 * 1024;
 async function handleScan(req, env, cors) {
   if (!env.ANTHROPIC_API_KEY) return json({ ok: false, error: 'ANTHROPIC_API_KEY is not set on the worker.' }, 500, cors);
@@ -305,7 +277,7 @@ async function callClaude(env, cors, system, content, timeoutMs, maxTokens, opts
     res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST', signal: ctrl.signal,
       headers: { 'content-type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify(Object.assign({ model: opts.model || env.MODEL || DEFAULT_MODEL, max_tokens: maxTokens, system, messages: [{ role: 'user', content }] }, opts.tools ? { tools: opts.tools } : { temperature: 0 }))
+      body: JSON.stringify({ model: opts.model || env.MODEL || DEFAULT_MODEL, max_tokens: maxTokens, temperature: 0, system, messages: [{ role: 'user', content }] })
     });
   } catch (e) {
     clearTimeout(timer);
@@ -316,10 +288,9 @@ async function callClaude(env, cors, system, content, timeoutMs, maxTokens, opts
   try { data = await res.json(); } catch (e) { /* fall through */ }
   if (!res.ok) {
     const msg = data && data.error && data.error.message ? data.error.message : ('AI error ' + res.status);
-    return json({ ok: false, error: opts.tools && /web.?search/i.test(msg) ? 'Web search is switched off for your Anthropic account. Turn it on at platform.claude.com → Settings → Privacy/Capabilities, then try again.' : msg }, 502, cors);
+    return json({ ok: false, error: msg }, 502, cors);
   }
-  let blocks = data && Array.isArray(data.content) ? data.content : [];
-  if (opts.afterSearch) { let last = -1; blocks.forEach((b, i) => { if (b.type === 'web_search_tool_result') last = i; }); blocks = blocks.slice(last + 1); }
+  const blocks = data && Array.isArray(data.content) ? data.content : [];
   const out = blocks.filter(c => c.type === 'text').map(c => c.text).join('');
   if (!out) return json({ ok: false, error: 'The System got an empty reply.' }, 502, cors);
   return json({ ok: true, text: out, model: data.model || env.MODEL || DEFAULT_MODEL }, 200, cors);
@@ -466,7 +437,7 @@ export default {
     if (req.method === 'OPTIONS') return new Response(null, { status: c.ok ? 204 : 403, headers: c.headers });
     if (origin && !c.ok) return json({ ok: false, error: 'Origin not allowed.' }, 403, c.headers);
     if (url.pathname === '/health' || url.pathname === '/') {
-      return json({ ok: true, app: 'winter-arc', version: 4, food: true, ai: !!env.ANTHROPIC_API_KEY, kv: !!env.SYNC, auth: !!env.APP_KEY, model: env.MODEL || DEFAULT_MODEL }, 200, c.headers);
+      return json({ ok: true, app: 'ascend', version: 5, food: true, fatsecret: !!(env.FATSECRET_ID && env.FATSECRET_SECRET), cofid: !!env.COFID_KEY, ai: !!env.ANTHROPIC_API_KEY, kv: !!env.SYNC, auth: !!env.APP_KEY, model: env.MODEL || DEFAULT_MODEL }, 200, c.headers);
     }
     if (!env.APP_KEY) return json({ ok: false, error: 'APP_KEY is not set on the worker.' }, 500, c.headers);
     const ip = ipOf(req);
@@ -474,14 +445,12 @@ export default {
     if (!safeEqual(req.headers.get('X-App-Key'), env.APP_KEY)) { const locked = await noteWrongKey(env, ip); return json({ ok: false, locked, error: locked ? 'Too many wrong app keys. This connection is locked for 15 minutes.' : 'Wrong app key.' }, locked ? 429 : 401, c.headers); }
     FAILS.delete(ip); // the right key clears the count of earlier slips
     try {
-      if (url.pathname === '/parse' && req.method === 'POST') return await handleParse(req, env, c.headers);
+      if (url.pathname === '/parse' || url.pathname === '/food/label' || url.pathname === '/food/web') return json({ ok: false, gone: true, error: 'Logging by Claude has been removed. Close and reopen the app to update it.' }, 410, c.headers);
       if (url.pathname === '/sync' && (req.method === 'GET' || req.method === 'PUT')) return await handleSync(req, env, c.headers, url);
       if ((url.pathname === '/sync/versions' || url.pathname === '/sync/version') && req.method === 'GET') return await handleVersions(req, env, c.headers, url);
       if (url.pathname === '/scan' && req.method === 'POST') return await handleScan(req, env, c.headers);
-      if (url.pathname === '/food/search' && req.method === 'GET') return await handleFoodSearch(url, c.headers);
+      if (url.pathname === '/food/search' && req.method === 'GET') return await handleFoodSearch(url, env, c.headers);
       if (url.pathname.indexOf('/food/barcode/') === 0 && req.method === 'GET') return await handleBarcode(url.pathname.split('/').pop(), c.headers);
-      if (url.pathname === '/food/label' && req.method === 'POST') return await handleLabel(req, env, c.headers);
-      if (url.pathname === '/food/web' && req.method === 'POST') return await handleWeb(req, env, c.headers);
       if ((url.pathname === '/inbox' && (req.method === 'GET' || req.method === 'POST')) || (url.pathname === '/inbox/ack' && req.method === 'POST')) return await handleInbox(req, env, c.headers, url.pathname);
       return json({ ok: false, error: 'Not found.' }, 404, c.headers);
     } catch (e) {

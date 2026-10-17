@@ -1,10 +1,12 @@
-# Winter Arc
+# Ascend
 
-Pavi's levelling fitness tracker. Type what you ate or trained and Claude turns it into numbers. Your habits become
+Pavi's levelling fitness tracker (it used to be called Winter Arc; the 85-day season inside it is still the Winter Arc).
+Search what you ate in the built-in UK menus and foods or the online databases, or type quick commands like
+“drank 750ml”, “weighed 88.6” or “lat pulldown 60kg 3x10”. Food logging no longer uses Claude. Your habits become
 quests, XP, ranks, bosses and secret heroes, and every day of the arc a different character from Pavi's own anime art
 stands on Home and in the Body tab, wrapped in a blazing aura of their own colour.
 
-**Version V17PRO · data version 10.** The arc runs **Thu 8 Oct 2026 to Thu 31 Dec 2026** (85 days), from **90.5kg** to a
+**Version V18 (Ascend) · data version 10.** The arc runs **Thu 8 Oct 2026 to Thu 31 Dec 2026** (85 days), from **90.5kg** to a
 goal of **79kg**.
 
 **The app is `index.html` plus its pictures in `art/`.** The rest of this folder is its source and its tests.
@@ -13,9 +15,11 @@ goal of **79kg**.
 |---|---|
 | `index.html` | The app (about 700 KB). Built from `src/` by `node build.mjs`. **Upload this.** |
 | `art/` | The 274 pictures (with Pavi's LUCK piece), written by the build: the AI-upscaled, twice-as-sharp versions from `art_hd/` where they exist, otherwise `art400/`. Since v17 they are separate files: the page opens about twice as fast and uses far less memory, and the phone keeps every picture after the first open. `art/t/` holds a grid-sized copy of each boss, weapon, hero and power (from `art_thumb/`), so the Bosses and Armoury tabs open without decoding 160 full-size pictures. **Upload this folder** whenever the build changes it. |
-| `sw.js` | Lets the app open with no signal, and keeps every picture on the phone. **Upload this too**, every time `index.html` changes. |
-| `manifest.json`, `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `zxing.min.js` | Home Screen icon, install details and the barcode reader. Upload once; they have not changed in V17PRO. |
-| `worker/worker.js` | The System: a Cloudflare Worker for Claude food logging, InBody photo reading, the food database, Apple Health inbox and the cloud copy. **Not changed in V17PRO.** |
+| `foods.json` | About 7,200 generic foods per 100g (USDA FoodData Central, via the tempo-food-db package), written by the build from `data/generic-usda.json`. The app fetches it once and keeps it offline. **Upload this too.** |
+| `data/chains/` | The UK chains' own published figures, one file per chain with its source and date (Greggs, KFC, Five Guys). The build puts them inside `index.html`. To add a chain, add a file in the same format and rebuild. |
+| `sw.js` | Lets the app open with no signal, and keeps every picture and the food list on the phone. **Upload this too**, every time `index.html` changes. |
+| `manifest.json`, `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `zxing.min.js` | Home Screen icon, install details and the barcode reader. `manifest.json` changed in V18 (the name Ascend). |
+| `worker/worker.js` | The System: a Cloudflare Worker for food search (FatSecret, CoFID, Open Food Facts), InBody photo reading, the Apple Health inbox and the cloud copy. **Changed in V18:** paste it into Cloudflare and add the FatSecret secrets (below). |
 | `hosted/winter-arc.html` | The same app built to live inside Claude (no GitHub, no Cloudflare). |
 | `src/` | Source: `core.js` (every rule), `app.js` (screens), `aura.js` (today's character and their aura), `hosted.js`, `styles.css`, `tests.js`, `index.src.html`. |
 | `art400/` | The source of the 273 pictures (83 bosses, 83 weapons, 11 heroes, 11 powers, and in `art400/a/` the 85 daily characters, numbered as in Pavi's list). `art400/unused/` holds the 14 that belonged to the seven bosses removed in v14. |
@@ -23,6 +27,26 @@ goal of **79kg**.
 
 No key, passcode or Worker address is written anywhere in this folder or in the page. They live only in your
 Cloudflare account and in the storage of the device you type them into.
+
+### Food data (V18)
+
+Search looks in this order, all at once: **your own foods** → **UK menus & foods built into the app** (the chains' own
+published figures, then generic foods per 100g; instant and offline) → **online databases through the System**: the
+UK government's CoFID database (when a `COFID_KEY` is set), **FatSecret** (2.3 million foods incl. UK restaurants) and
+**Open Food Facts** (packaged products and barcodes). Nothing is sent to Claude. Claude is used only to read InBody
+screenshots.
+
+**Cloudflare secrets for food search** (Worker → Settings → Variables and Secrets → Add → type *Secret*):
+
+| Name | Value |
+|---|---|
+| `FATSECRET_ID` | your FatSecret Platform API Client ID |
+| `FATSECRET_SECRET` | your FatSecret Platform API Client Secret |
+| `COFID_KEY` | optional: a CoFID API key from the Quadram Institute (email fn-nbri@quadram.ac.uk) |
+
+FatSecret only answers from internet addresses approved in your FatSecret account (*IP Restrictions*). If it refuses,
+the app shows the exact address under “Online databases” in the food search: add it there. On the free Basic plan the
+UK-only results are not available, so FatSecret searches its whole database.
 
 ---
 
@@ -59,7 +83,7 @@ Nothing logged before 8 Oct or after 31 Dec earns XP, streaks, awards, bosses or
 
 ## 2. The Cloudflare Worker (the System)
 
-If your Worker already runs the current `worker.js` you do not need to touch it for V17PRO. To check: open the app →
+V18 changes `worker.js`: paste the new one into Cloudflare (Edit code → select all → paste → Deploy) and add the FatSecret secrets above. To check: open the app →
 ⚙️ → **Test connection**. If no line mentions "an older version", it is current.
 
 Setting it up from nothing:
@@ -90,7 +114,7 @@ Set a monthly spend limit at console.anthropic.com. Each food log is one short C
 3. ⚙️ → **Diagnostics**: every line should say PASS (two of them check today's character and all 85 pictures).
 
 **Updating an iPhone that already has the app:** open it with signal, wait ten seconds, close it fully (swipe it
-away), open it again. ⚙️ should now end with "Winter Arc V17PRO · data v10". Your logs are never removed by an update. v16 only adds to your save: a place for
+away), open it again. ⚙️ should now end with "Ascend V18 · data v10". Your logs are never removed by an update. v16 only adds to your save: a place for
 your profile picture, your theme, and the date Penalty Quests stopped.
 
 ## 4. On a laptop

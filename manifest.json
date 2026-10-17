@@ -1,7 +1,7 @@
 {
-  "name": "Winter Arc",
-  "short_name": "Winter Arc",
-  "description": "Pavi's levelling fitness tracker: AI food logging, quests, bosses, InBody scans and a 3D hologram.",
+  "name": "Ascend",
+  "short_name": "Ascend",
+  "description": "Pavi's levelling fitness tracker: food logging from UK menus and databases, quests, bosses, InBody scans and auras.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
@@ -10,8 +10,23 @@
   "theme_color": "#04080f",
   "lang": "en-GB",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
