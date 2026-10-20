@@ -8,6 +8,7 @@
    • GET  /inbox   → the app collects it; POST /inbox/ack removes confirmed items
    • GET  /food/search?q=  → food search across FatSecret (UK), the UK government database (CoFID) and Open Food Facts
    • GET  /food/barcode/:code → product by barcode (Open Food Facts)
+   • GET  /food/check → is FatSecret answering, and this Worker's internet address (for FatSecret's IP Restrictions)
    • GET  /push/key, POST /push/subscribe|unsubscribe|test → iPhone reminders (needs SYNC); a Cron Trigger every 30
      minutes sends water and protein reminders when you're behind
    • GET  /health  → shows what's configured
@@ -105,7 +106,7 @@ function fsError(j, status) {
   const e = j && j.error, code = e && (e.code != null ? Number(e.code) : null), msg = String(e && (e.message || e) || ('FatSecret error ' + status));
   const ip = /(\d{1,3}(?:\.\d{1,3}){3}|[0-9a-f:]{6,})/i.exec(msg);
   if (code === 21 || /ip address/i.test(msg)) return 'FatSecret refused this Worker’s address' + (ip ? ' (' + ip[1] + ')' : '') + '. Approve it under IP Restrictions in your FatSecret account.';
-  if (code === 2 || code === 13 || /invalid_client|credential|token/i.test(msg)) return 'FatSecret didn’t accept the Client ID or Secret. Check FATSECRET_ID and FATSECRET_SECRET in Cloudflare.';
+  if (code === 2 || code === 13 || /invalid_client|credential|token/i.test(msg)) return 'FatSecret didn’t accept the Client ID or Secret. Check FATSECRET_ID and FATSECRET_SECRET in Cloudflare (no spaces, and the newest secret), and that this Worker’s address is approved under IP Restrictions in FatSecret.';
   if (code === 22 || /quota|limit/i.test(msg)) return 'FatSecret’s daily limit is used up. It resets tomorrow.';
   return 'FatSecret: ' + msg.slice(0, 160);
 }
@@ -131,6 +132,14 @@ export function fsCompact(f) {
   if (per100 && per100.kcal > 950) return null;
   return { id: 'fs-' + String(f.food_id || '').replace(/\D/g, '').slice(0, 20), code: '', name: name.slice(0, 80), brand: String(f.brand_name || '').trim().slice(0, 60), source: 'fatsecret',
     per100, serving: is100 ? null : Object.assign({ label: label.slice(0, 40), g: g && g <= 3000 ? g : null }, mac), uk: true };
+}
+/* VF: is FatSecret answering, and from which internet address is this Worker calling? (FatSecret only answers addresses
+   approved under IP Restrictions in your FatSecret account; Test connection in the app shows this) */
+async function handleFoodCheck(env, cors) {
+  let ip = null, fatsecret = 'not set up';
+  try { const r = await fetch('https://api.ipify.org?format=json'); const j = await r.json(); if (j && typeof j.ip === 'string' && j.ip.length < 64) ip = j.ip; } catch (e) {}
+  if (env.FATSECRET_ID && env.FATSECRET_SECRET) { try { const r = await fatSecretSearch(env, 'apple'); fatsecret = r.status; } catch (e) { fatsecret = String(e && e.message || e).slice(0, 220); } }
+  return json({ ok: true, fatsecret, ip }, 200, cors);
 }
 async function fatSecretSearch(env, q) {
   if (!env.FATSECRET_ID || !env.FATSECRET_SECRET) return { status: 'not set up', items: [] };
@@ -562,7 +571,7 @@ export default {
     if (req.method === 'OPTIONS') return new Response(null, { status: c.ok ? 204 : 403, headers: c.headers });
     if (origin && !c.ok) return json({ ok: false, error: 'Origin not allowed.' }, 403, c.headers);
     if (url.pathname === '/health' || url.pathname === '/') {
-      return json({ ok: true, app: 'ascend', version: 6, food: true, push: !!env.SYNC, fatsecret: !!(env.FATSECRET_ID && env.FATSECRET_SECRET), cofid: !!env.COFID_KEY, ai: !!env.ANTHROPIC_API_KEY, kv: !!env.SYNC, auth: !!env.APP_KEY, model: env.MODEL || DEFAULT_MODEL }, 200, c.headers);
+      return json({ ok: true, app: 'ascend', version: 7, food: true, push: !!env.SYNC, fatsecret: !!(env.FATSECRET_ID && env.FATSECRET_SECRET), cofid: !!env.COFID_KEY, ai: !!env.ANTHROPIC_API_KEY, kv: !!env.SYNC, auth: !!env.APP_KEY, model: env.MODEL || DEFAULT_MODEL }, 200, c.headers);
     }
     if (!env.APP_KEY) return json({ ok: false, error: 'APP_KEY is not set on the worker.' }, 500, c.headers);
     const ip = ipOf(req);
@@ -575,6 +584,7 @@ export default {
       if ((url.pathname === '/sync/versions' || url.pathname === '/sync/version') && req.method === 'GET') return await handleVersions(req, env, c.headers, url);
       if (url.pathname === '/scan' && req.method === 'POST') return await handleScan(req, env, c.headers);
       if (url.pathname === '/food/search' && req.method === 'GET') return await handleFoodSearch(url, env, c.headers);
+      if (url.pathname === '/food/check' && req.method === 'GET') return await handleFoodCheck(env, c.headers);
       if (url.pathname.indexOf('/food/barcode/') === 0 && req.method === 'GET') return await handleBarcode(url.pathname.split('/').pop(), c.headers);
       if ((url.pathname === '/push/key' && req.method === 'GET') || (['/push/subscribe', '/push/unsubscribe', '/push/test'].indexOf(url.pathname) >= 0 && req.method === 'POST')) return await handlePush(req, env, c.headers, url.pathname);
       if ((url.pathname === '/inbox' && (req.method === 'GET' || req.method === 'POST')) || (url.pathname === '/inbox/ack' && req.method === 'POST')) return await handleInbox(req, env, c.headers, url.pathname);

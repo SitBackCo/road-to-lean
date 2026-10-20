@@ -6,7 +6,7 @@ Search what you ate in the built-in UK menus and foods or the online databases, 
 quests, XP, ranks, bosses and secret heroes, and every day of the arc a different character from Pavi's own anime art
 stands on Home and in the Body tab, wrapped in a blazing aura of their own colour.
 
-**Version V19 (Ascend) · data version 10.** The arc runs **Thu 8 Oct 2026 to Thu 31 Dec 2026** (85 days), from **90.5kg** to a
+**Version VF (Ascend, the final version) · data version 10.** The arc runs **Thu 8 Oct 2026 to Thu 31 Dec 2026** (85 days), from **90.5kg** to a
 goal of **79kg**.
 
 **The app is `index.html` plus its pictures in `art/`.** The rest of this folder is its source and its tests.
@@ -27,6 +27,20 @@ goal of **79kg**.
 
 No key, passcode or Worker address is written anywhere in this folder or in the page. They live only in your
 Cloudflare account and in the storage of the device you type them into.
+
+### New in VF (the final version)
+
+- **The full opening every time** (it no longer shortens after a few opens), and the character's aura waits for it to
+  finish, so it starts at full sharpness.
+- **Sharper characters:** the 85 daily characters are AI-upscaled to three times their original size (`art_uhd/`), drawn
+  at the iPhone's full 3× resolution on Home, and the aura no longer stays soft after a busy moment: it climbs back to
+  full sharpness as soon as the phone keeps up. A touch more brightness and colour on the characters.
+- **More vibrant:** every dark theme's cards carry their own colour with a lit edge and a soft glow; buttons, tiles and
+  quest icons are richer; Inferno is warmer ember instead of brown. Text colours are unchanged and still pass the
+  4.5:1 readability check.
+- **Bedtime 10–11pm:** the Lights out quest reads "In bed 10–11pm" (an old 9:45pm setting moves to it).
+- **FatSecret check:** ⚙️ → Test connection now says whether FatSecret really answers and, if not, shows the Worker's
+  internet address to approve in FatSecret → IP Restrictions. Needs the new `worker.js` (version 7).
 
 ### New in V19
 
@@ -105,7 +119,7 @@ Nothing logged before 8 Oct or after 31 Dec earns XP, streaks, awards, bosses or
 
 ## 2. The Cloudflare Worker (the System)
 
-V19 changes `worker.js`: paste the new one into Cloudflare (Edit code → select all → paste → Deploy), add the FatSecret secrets above if you haven't, and add the Cron Trigger for reminders. To check: open the app →
+VF changes `worker.js` (the FatSecret check): paste the new one into Cloudflare (Edit code → select all → paste → Deploy), add the FatSecret secrets above if you haven't, and add the Cron Trigger for reminders. To check: open the app →
 ⚙️ → **Test connection**. If no line mentions "an older version", it is current.
 
 Setting it up from nothing:
@@ -124,7 +138,7 @@ Setting it up from nothing:
    `LIMIT_SCAN` (12), `LIMIT_LABEL` (30), `LIMIT_WEB` (8).
 4. **Storage for the cloud copy and Apple Health:** Workers & Pages → **KV** → **Create namespace** (any name). Then
    the Worker's **Settings → Bindings → Add → KV namespace** → variable name **`SYNC`** → pick the namespace → Deploy.
-5. Open `https://<your-worker-address>/health`. You should see `"auth":true,"kv":true,"push":true,"version":6`.
+5. Open `https://<your-worker-address>/health`. You should see `"auth":true,"kv":true,"push":true,"version":7`.
 
 Set a monthly spend limit at console.anthropic.com. Each food log is one short Claude Haiku call.
 
@@ -136,7 +150,7 @@ Set a monthly spend limit at console.anthropic.com. Each food log is one short C
 3. ⚙️ → **Diagnostics**: every line should say PASS (two of them check today's character and all 85 pictures).
 
 **Updating an iPhone that already has the app:** open it with signal, wait ten seconds, close it fully (swipe it
-away), open it again. ⚙️ should now end with "Ascend V19 · data v10". For the new icon and name, delete the old Home Screen icon and add it again from Safari. Your logs are never removed by an update. v16 only adds to your save: a place for
+away), open it again. ⚙️ should now end with "Ascend VF · data v10". For the new icon and name, delete the old Home Screen icon and add it again from Safari. Your logs are never removed by an update. v16 only adds to your save: a place for
 your profile picture, your theme, and the date Penalty Quests stopped.
 
 ## 4. On a laptop

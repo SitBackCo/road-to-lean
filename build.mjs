@@ -27,7 +27,8 @@ for (const w of wanted) {
   if (!fs.existsSync(file)) throw new Error('Missing picture art400/' + w + '.webp');
   // v18: the app on GitHub uses the AI-upscaled, twice-as-sharp version from art_hd/ where there is one; the page that
   // lives inside Claude keeps the original size (it has to fit in one file)
-  const hd = path.join(ROOT, 'art_hd', w + '.webp'), buf = fs.readFileSync(file), hbuf = fs.existsSync(hd) ? fs.readFileSync(hd) : buf, out = path.join(ROOT, 'art', w + '.webp');
+  // VF: the 85 daily characters come from art_uhd/ (three times the original size, for the aura stage) where there is one
+  const uhd = path.join(ROOT, 'art_uhd', w + '.webp'), hd = fs.existsSync(uhd) ? uhd : path.join(ROOT, 'art_hd', w + '.webp'), buf = fs.readFileSync(file), hbuf = fs.existsSync(hd) ? fs.readFileSync(hd) : buf, out = path.join(ROOT, 'art', w + '.webp');
   if (hbuf !== buf) hdCount++;
   fs.mkdirSync(path.dirname(out), { recursive: true }); fs.writeFileSync(out, hbuf);
   artFiles['art/' + w + '.webp'] = 'art/' + w + '.webp?v=' + crypto.createHash('sha256').update(hbuf).digest('hex').slice(0, 10);
