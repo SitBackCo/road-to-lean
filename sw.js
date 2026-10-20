@@ -1,5 +1,5 @@
 /* Ascend service worker — offline app shell. Never caches the System (Cloudflare Worker) API. */
-const VERSION = 'rtl-ascend-1', ART = 'rtl-art-3', MINE = 'rtl-';
+const VERSION = 'rtl-ascend-2', ART = 'rtl-art-3', MINE = 'rtl-';
 const PAGE = './index.html', REST = ['./zxing.min.js', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 const END = '<!--winter-arc:end-->'; // the build writes this as the very last thing in the app page
 const scopePath = () => new URL(self.registration.scope).pathname;
@@ -45,5 +45,18 @@ self.addEventListener('fetch', e => {
   e.respondWith(caches.match(req).then(hit => {
     const net = fetch(req).then(r => { if (r && (r.ok || r.type === 'opaque')) { const copy = r.clone(); caches.open(VERSION).then(c => c.put(req, copy)); } return r; }).catch(() => hit);
     return hit || net;
+  }));
+});
+// iPhone reminders: the Worker sends water and protein reminders here; tapping one opens the app at the right place
+self.addEventListener('push', e => {
+  let d = {}; try { d = e.data ? e.data.json() : {}; } catch (x) { d = { body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'Ascend', { body: d.body || '', tag: d.tag || 'ascend', icon: 'icon-192.png', badge: 'icon-192.png', data: { url: d.url || './' } }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = new URL((e.notification.data && e.notification.data.url) || './', self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    for (const c of list) if ('focus' in c) { c.postMessage({ type: 'notify', url }); return c.focus(); }
+    return self.clients.openWindow ? self.clients.openWindow(url) : null;
   }));
 });

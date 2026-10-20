@@ -8,6 +8,8 @@
    • GET  /inbox   → the app collects it; POST /inbox/ack removes confirmed items
    • GET  /food/search?q=  → food search across FatSecret (UK), the UK government database (CoFID) and Open Food Facts
    • GET  /food/barcode/:code → product by barcode (Open Food Facts)
+   • GET  /push/key, POST /push/subscribe|unsubscribe|test → iPhone reminders (needs SYNC); a Cron Trigger every 30
+     minutes sends water and protein reminders when you're behind
    • GET  /health  → shows what's configured
    Food logging no longer uses Claude: /parse, /food/label and /food/web answer 410 (gone).
    Secrets (Settings → Variables and Secrets) — never written in this file:
@@ -429,6 +431,129 @@ async function handleVersions(req, env, cors, url) {
   return rawReply(c.meta, c.raw, cors);
 }
 
+/* ═══════════════ iPhone reminders (Web Push) ═══════════════
+   The app sends its push subscription to POST /push/subscribe. A Cron Trigger (every 30 minutes) runs scheduled() below:
+   it reads your cloud copy, works out today's water and protein in London time and, only when you are behind, sends a
+   reminder. The keys that sign the pushes (VAPID) are made by the Worker itself the first time and kept in the SYNC KV,
+   so there is nothing extra to paste. Messages are encrypted for your phone only (RFC 8291 aes128gcm). */
+const b64u = buf => { let s = ''; const b = new Uint8Array(buf); for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+const unb64u = str => { const s = String(str || '').replace(/-/g, '+').replace(/_/g, '/'); const bin = atob(s + '==='.slice((s.length + 3) % 4)); const out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; };
+const cat = (...arrs) => { const n = arrs.reduce((a, x) => a + x.length, 0), out = new Uint8Array(n); let o = 0; arrs.forEach(x => { out.set(x, o); o += x.length; }); return out; };
+const TXT = s => new TextEncoder().encode(s);
+async function hkdf(salt, ikm, info, bytes) { const k = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']); return new Uint8Array(await crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt, info }, k, bytes * 8)); }
+/* the payload, encrypted for one subscription (keys.p256dh, keys.auth) → the request body */
+export async function encryptPush(sub, text, saltIn, asKeys) {
+  const uaPub = unb64u(sub.keys.p256dh), auth = unb64u(sub.keys.auth);
+  if (uaPub.length !== 65 || auth.length < 16) throw new Error('bad subscription keys');
+  const as = asKeys || await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const asPub = new Uint8Array(await crypto.subtle.exportKey('raw', as.publicKey));
+  const uaKey = await crypto.subtle.importKey('raw', uaPub, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const ecdh = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: uaKey }, as.privateKey, 256));
+  const ikm = await hkdf(auth, ecdh, cat(TXT('WebPush: info\0'), uaPub, asPub), 32);
+  const salt = saltIn || crypto.getRandomValues(new Uint8Array(16));
+  const cek = await hkdf(salt, ikm, TXT('Content-Encoding: aes128gcm\0'), 16), nonce = await hkdf(salt, ikm, TXT('Content-Encoding: nonce\0'), 12);
+  const key = await crypto.subtle.importKey('raw', cek, 'AES-GCM', false, ['encrypt']);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, key, cat(TXT(text), new Uint8Array([2]))));
+  const head = new Uint8Array(21); head.set(salt, 0); new DataView(head.buffer).setUint32(16, 4096); head[20] = 65;
+  return cat(head, asPub, ct);
+}
+/* the Worker's own signing keys, made once and kept in KV */
+export async function vapidKeys(env) {
+  let j = null; try { j = JSON.parse(await env.SYNC.get('push:vapid') || 'null'); } catch (e) {}
+  if (!j || !j.d || !j.x || !j.y) {
+    const kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+    const jw = await crypto.subtle.exportKey('jwk', kp.privateKey); j = { d: jw.d, x: jw.x, y: jw.y };
+    await env.SYNC.put('push:vapid', JSON.stringify(j));
+  }
+  const pub = b64u(cat(new Uint8Array([4]), unb64u(j.x), unb64u(j.y)));
+  const priv = await crypto.subtle.importKey('jwk', { kty: 'EC', crv: 'P-256', d: j.d, x: j.x, y: j.y, ext: true }, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+  return { pub, priv };
+}
+async function vapidAuth(endpoint, keys, subject) {
+  const aud = new URL(endpoint).origin, now = Math.floor(Date.now() / 1000);
+  const head = b64u(TXT(JSON.stringify({ typ: 'JWT', alg: 'ES256' }))), body = b64u(TXT(JSON.stringify({ aud, exp: now + 12 * 3600, sub: subject || 'mailto:ascend@example.com' })));
+  const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, keys.priv, TXT(head + '.' + body));
+  return 'vapid t=' + head + '.' + body + '.' + b64u(sig) + ', k=' + keys.pub;
+}
+async function sendPush(env, sub, msg, keys) {
+  const body = await encryptPush(sub, JSON.stringify(msg));
+  const r = await fetch(sub.endpoint, { method: 'POST', headers: { 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '3600', Urgency: 'normal', Authorization: await vapidAuth(sub.endpoint, keys, env.PUSH_SUBJECT) }, body });
+  return r.status;
+}
+async function readSubs(env) { try { const a = JSON.parse(await env.SYNC.get('push:subs') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function cleanSub(x) {
+  if (!x || typeof x !== 'object' || typeof x.endpoint !== 'string' || !/^https:\/\//.test(x.endpoint) || x.endpoint.length > 1000 || !x.keys || typeof x.keys.p256dh !== 'string' || typeof x.keys.auth !== 'string') return null;
+  return { endpoint: x.endpoint, keys: { p256dh: x.keys.p256dh.slice(0, 200), auth: x.keys.auth.slice(0, 100) }, added: Date.now() };
+}
+async function pushToAll(env, msg) {
+  const subs = await readSubs(env); if (!subs.length) return { sent: 0, subs: 0 };
+  const keys = await vapidKeys(env); let sent = 0; const keep = [];
+  for (const sub of subs) {
+    let st = 0; try { st = await sendPush(env, sub, msg, keys); } catch (e) { st = -1; }
+    if (st === 404 || st === 410) continue; // the phone dropped this subscription
+    keep.push(sub); if (st >= 200 && st < 300) sent++;
+  }
+  if (keep.length !== subs.length) await env.SYNC.put('push:subs', JSON.stringify(keep));
+  return { sent, subs: keep.length };
+}
+async function handlePush(req, env, cors, path) {
+  if (!env.SYNC) return json({ ok: false, error: 'Reminders need the SYNC KV binding (the same one cloud backup uses).' }, 501, cors);
+  if (path === '/push/key') return json({ ok: true, key: (await vapidKeys(env)).pub }, 200, cors);
+  let body = {}; try { body = await req.json(); } catch (e) {}
+  if (path === '/push/subscribe') {
+    const sub = cleanSub(body && body.sub); if (!sub) return json({ ok: false, error: 'That isn’t a push subscription.' }, 400, cors);
+    const subs = (await readSubs(env)).filter(x => x.endpoint !== sub.endpoint); subs.push(sub);
+    await env.SYNC.put('push:subs', JSON.stringify(subs.slice(-5)));
+    return json({ ok: true, devices: Math.min(5, subs.length) }, 200, cors);
+  }
+  if (path === '/push/unsubscribe') {
+    const ep = body && body.endpoint; const subs = (await readSubs(env)).filter(x => ep ? x.endpoint !== ep : false);
+    await env.SYNC.put('push:subs', JSON.stringify(subs)); return json({ ok: true, devices: subs.length }, 200, cors);
+  }
+  if (path === '/push/test') {
+    const r = await pushToAll(env, { title: 'Ascend', body: 'Reminders are on. You’ll hear from the System when you fall behind on water or protein.', tag: 'test', url: './' });
+    return json(Object.assign({ ok: r.sent > 0, error: r.subs ? (r.sent ? '' : 'The phone’s push service refused it. Turn notifications off and on again in Settings.') : 'No phone is signed up yet. Tap “Turn on notifications” first.' }, r), 200, cors);
+  }
+  return json({ ok: false, error: 'Not found.' }, 404, cors);
+}
+/* London wall-clock for an instant: { day: 'YYYY-MM-DD', h, m } */
+export function londonNow(ms) {
+  const p = {}; new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(ms)).forEach(x => { p[x.type] = x.value; });
+  return { day: p.year + '-' + p.month + '-' + p.day, h: +p.hour, m: +p.minute };
+}
+export const WATER_HOURS = [9, 11, 13, 15, 17, 19, 21], MACRO_HOURS = [13, 16, 20];
+/* the reminder due now, if any: state = the cloud copy; sent = slots already sent today. Returns { slot, msg } or null */
+export function reminderDue(state, now, sent) {
+  if (!state || typeof state !== 'object') return null;
+  const st = state.settings && state.settings.remind; if (!st || st.on !== true) return null;
+  const d = (state.days && state.days[now.day]) || {}, T = state.targets || {}, done = sent || [];
+  const water = Math.max(0, Number(d.water) || 0), wt = Number(T.waterMl) || 3000, foods = Array.isArray(d.foods) ? d.foods : [];
+  const prot = foods.reduce((a, f) => a + (Number(f && f.p) || 0), 0), pt = Number(T.protein) || 160, kcal = foods.reduce((a, f) => a + (Number(f && f.cal) || 0), 0);
+  const nf = v => Math.round(v).toLocaleString('en-GB');
+  if (st.water !== false && WATER_HOURS.indexOf(now.h) >= 0 && done.indexOf('w' + now.h) < 0) {
+    const want = Math.round(wt * (now.h - 8) / 13 / 50) * 50;
+    if (water < wt && water < want - 100) return { slot: 'w' + now.h, msg: { title: '💧 Water check', body: nf(water) + 'ml of ' + (wt / 1000) + 'L so far. Aim for about ' + nf(want) + 'ml by now. Have a glass, then tap to log it.', tag: 'water', url: './?do=water' } };
+  }
+  if (st.macros !== false && MACRO_HOURS.indexOf(now.h) >= 0 && done.indexOf('m' + now.h) < 0) {
+    if (now.h === 13 && !foods.length) return { slot: 'm13', msg: { title: '🍽️ Nothing logged yet', body: 'Log breakfast and lunch so the System can keep your calories and protein on track.', tag: 'macros', url: './?do=log' } };
+    const want = Math.round(pt * (now.h - 8) / 14);
+    if (now.h > 13 && prot < want - 10) return { slot: 'm' + now.h, msg: { title: '🥩 Protein check', body: Math.round(prot) + 'g of ' + pt + 'g protein so far (' + nf(kcal) + ' kcal). ' + (now.h >= 20 ? Math.round(pt - prot) + 'g to go: a shake or a high-protein snack closes most of it.' : 'Aim for about ' + want + 'g by now.'), tag: 'macros', url: './?do=log' } };
+  }
+  return null;
+}
+export async function runReminders(env, ms) {
+  if (!env.SYNC) return { skipped: 'no KV' };
+  const subs = await readSubs(env); if (!subs.length) return { skipped: 'no phones' };
+  const cur = await readCopy(env, 'state'); if (!cur || !cur.raw) return { skipped: 'no cloud copy' };
+  let state = null; try { state = JSON.parse(cur.raw); } catch (e) { return { skipped: 'unreadable' }; }
+  const now = londonNow(ms || Date.now());
+  let log = { day: '', slots: [] }; try { log = JSON.parse(await env.SYNC.get('push:sent') || 'null') || log; } catch (e) {}
+  if (log.day !== now.day) log = { day: now.day, slots: [] };
+  const due = reminderDue(state, now, log.slots); if (!due) return { skipped: 'nothing due' };
+  log.slots.push(due.slot); await env.SYNC.put('push:sent', JSON.stringify(log)); // marked first, so a slow run never sends it twice
+  return Object.assign({ slot: due.slot }, await pushToAll(env, due.msg));
+}
+
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
@@ -437,7 +562,7 @@ export default {
     if (req.method === 'OPTIONS') return new Response(null, { status: c.ok ? 204 : 403, headers: c.headers });
     if (origin && !c.ok) return json({ ok: false, error: 'Origin not allowed.' }, 403, c.headers);
     if (url.pathname === '/health' || url.pathname === '/') {
-      return json({ ok: true, app: 'ascend', version: 5, food: true, fatsecret: !!(env.FATSECRET_ID && env.FATSECRET_SECRET), cofid: !!env.COFID_KEY, ai: !!env.ANTHROPIC_API_KEY, kv: !!env.SYNC, auth: !!env.APP_KEY, model: env.MODEL || DEFAULT_MODEL }, 200, c.headers);
+      return json({ ok: true, app: 'ascend', version: 6, food: true, push: !!env.SYNC, fatsecret: !!(env.FATSECRET_ID && env.FATSECRET_SECRET), cofid: !!env.COFID_KEY, ai: !!env.ANTHROPIC_API_KEY, kv: !!env.SYNC, auth: !!env.APP_KEY, model: env.MODEL || DEFAULT_MODEL }, 200, c.headers);
     }
     if (!env.APP_KEY) return json({ ok: false, error: 'APP_KEY is not set on the worker.' }, 500, c.headers);
     const ip = ipOf(req);
@@ -451,10 +576,13 @@ export default {
       if (url.pathname === '/scan' && req.method === 'POST') return await handleScan(req, env, c.headers);
       if (url.pathname === '/food/search' && req.method === 'GET') return await handleFoodSearch(url, env, c.headers);
       if (url.pathname.indexOf('/food/barcode/') === 0 && req.method === 'GET') return await handleBarcode(url.pathname.split('/').pop(), c.headers);
+      if ((url.pathname === '/push/key' && req.method === 'GET') || (['/push/subscribe', '/push/unsubscribe', '/push/test'].indexOf(url.pathname) >= 0 && req.method === 'POST')) return await handlePush(req, env, c.headers, url.pathname);
       if ((url.pathname === '/inbox' && (req.method === 'GET' || req.method === 'POST')) || (url.pathname === '/inbox/ack' && req.method === 'POST')) return await handleInbox(req, env, c.headers, url.pathname);
       return json({ ok: false, error: 'Not found.' }, 404, c.headers);
     } catch (e) {
       return json({ ok: false, error: 'Worker error: ' + (e && e.message || e) }, 500, c.headers);
     }
-  }
+  },
+  // Cron Trigger (Settings → Triggers → Cron, every 30 minutes): water and protein reminders
+  async scheduled(event, env, ctx) { ctx.waitUntil(runReminders(env, event && event.scheduledTime || Date.now()).catch(() => {})); }
 };

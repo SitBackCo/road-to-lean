@@ -6,7 +6,7 @@ Search what you ate in the built-in UK menus and foods or the online databases, 
 quests, XP, ranks, bosses and secret heroes, and every day of the arc a different character from Pavi's own anime art
 stands on Home and in the Body tab, wrapped in a blazing aura of their own colour.
 
-**Version V18 (Ascend) · data version 10.** The arc runs **Thu 8 Oct 2026 to Thu 31 Dec 2026** (85 days), from **90.5kg** to a
+**Version V19 (Ascend) · data version 10.** The arc runs **Thu 8 Oct 2026 to Thu 31 Dec 2026** (85 days), from **90.5kg** to a
 goal of **79kg**.
 
 **The app is `index.html` plus its pictures in `art/`.** The rest of this folder is its source and its tests.
@@ -15,18 +15,40 @@ goal of **79kg**.
 |---|---|
 | `index.html` | The app (about 700 KB). Built from `src/` by `node build.mjs`. **Upload this.** |
 | `art/` | The 274 pictures (with Pavi's LUCK piece), written by the build: the AI-upscaled, twice-as-sharp versions from `art_hd/` where they exist, otherwise `art400/`. Since v17 they are separate files: the page opens about twice as fast and uses far less memory, and the phone keeps every picture after the first open. `art/t/` holds a grid-sized copy of each boss, weapon, hero and power (from `art_thumb/`), so the Bosses and Armoury tabs open without decoding 160 full-size pictures. **Upload this folder** whenever the build changes it. |
-| `foods.json` | About 7,200 generic foods per 100g (USDA FoodData Central, via the tempo-food-db package), written by the build from `data/generic-usda.json`. The app fetches it once and keeps it offline. **Upload this too.** |
-| `data/chains/` | The UK chains' own published figures, one file per chain with its source and date (Greggs, KFC, Five Guys). The build puts them inside `index.html`. To add a chain, add a file in the same format and rebuild. |
+| `foods.json` | About 7,200 generic foods per 100g (USDA FoodData Central, via the tempo-food-db package) plus about 620 foods copied from MyFitnessPal's database (`data/mfp/`: Sri Lankan and South Indian dishes, UK supermarket products, takeaways, protein products), written by the build. The app fetches it once and keeps it offline. **Upload this too.** |
+| `data/chains/` | The UK chains' own published figures, one file per chain with its source and date (Greggs, KFC, Five Guys, Domino's). The build puts them inside `index.html`. To add a chain, add a file in the same format and rebuild. |
 | `sw.js` | Lets the app open with no signal, and keeps every picture and the food list on the phone. **Upload this too**, every time `index.html` changes. |
-| `manifest.json`, `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `zxing.min.js` | Home Screen icon, install details and the barcode reader. `manifest.json` changed in V18 (the name Ascend). |
-| `worker/worker.js` | The System: a Cloudflare Worker for food search (FatSecret, CoFID, Open Food Facts), InBody photo reading, the Apple Health inbox and the cloud copy. **Changed in V18:** paste it into Cloudflare and add the FatSecret secrets (below). |
+| `manifest.json`, `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `zxing.min.js` | Home Screen icon (V19: the orange Rank-up chevrons, drawn from `src/brand/icon.svg` by `node tools/icons.mjs`), install details and the barcode reader. **Upload the three icons again in V19.** |
+| `worker/worker.js` | The System: a Cloudflare Worker for food search (FatSecret, CoFID, Open Food Facts), InBody photo reading, the Apple Health inbox, the cloud copy and (V19) the iPhone reminders. **Changed in V19:** paste it into Cloudflare, add the FatSecret secrets and a Cron Trigger (below). |
 | `hosted/winter-arc.html` | The same app built to live inside Claude (no GitHub, no Cloudflare). |
-| `src/` | Source: `core.js` (every rule), `app.js` (screens), `aura.js` (today's character and their aura), `hosted.js`, `styles.css`, `tests.js`, `index.src.html`. |
+| `src/` | Source: `core.js` (every rule), `app.js` (screens), `intro.js` (the opening: Sae Itoshi's and Natsu's cards), `aura.js` (today's character and their aura), `hosted.js`, `styles.css`, `tests.js`, `index.src.html`, `brand/icon.svg`. |
 | `art400/` | The source of the 273 pictures (83 bosses, 83 weapons, 11 heroes, 11 powers, and in `art400/a/` the 85 daily characters, numbered as in Pavi's list). `art400/unused/` holds the 14 that belonged to the seven bosses removed in v14. |
 | `test/` | The tests (see the end of this page). |
 
 No key, passcode or Worker address is written anywhere in this folder or in the page. They live only in your
 Cloudflare account and in the storage of the device you type them into.
+
+### New in V19
+
+- **The opening:** two 3D playing cards. Sae Itoshi (the ten, pink aura) flips in and bursts pink, is thrown aside in a
+  flash, then Natsu (the ace, fire) flips in, ignites and explodes into the Rank-up icon and ASCEND. The full version on
+  the first three opens on a device, a short one (both cards together) after that. Tap anywhere to skip.
+- **About 20% brighter** dark themes, and the new orange Rank-up icon on the Home Screen and in the header.
+- **Quick add** (just the calories, and protein/carbs/fat if you know them), **My recipes** (add a whole pot once, say
+  how many portions, log a plate in one tap) and **＋ Add on every meal** of the Log tab, like MyFitnessPal.
+- **iPhone reminders:** water every 2 hours from 9am to 9pm when you're behind on 3L, protein checks at 4pm and 8pm, and
+  a nudge at 1pm if nothing is logged. ⚙️ → Reminders.
+- **More food:** about 620 MyFitnessPal foods (Sri Lankan and South Indian dishes, UK supermarket and takeaway items,
+  protein products) and Domino's official per-slice figures.
+
+### iPhone reminders (V19)
+
+They come from your Worker, so it needs three things: the **new worker.js**, the **`SYNC` KV binding** you already use for
+the cloud copy, and a **Cron Trigger**: Worker → **Settings → Triggers → Cron Triggers → Add** → *Every 30 minutes*
+(`*/30 * * * *`) → **Add**. The Worker makes its own signing keys the first time, so there are no new secrets.
+On the iPhone (iOS 16.4 or later) open Ascend **from its Home Screen icon** → ⚙️ → Reminders → **Turn on
+notifications** → Allow → **Send a test**. The Worker reads your cloud copy every 30 minutes and sends a reminder only
+when you're behind, at most once per slot.
 
 ### Food data (V18)
 
@@ -76,14 +98,14 @@ Nothing logged before 8 Oct or after 31 Dec earns XP, streaks, awards, bosses or
 ## 1. Put the app on GitHub Pages
 
 1. github.com → your **road-to-lean** repository (or **New repository**, Public, if you are starting again).
-2. **Add file → Upload files**. Drag in `index.html`, `sw.js` and the `art` folder (first time: also `manifest.json`, the
-   three icons and `zxing.min.js`). **Commit changes**.
+2. **Add file → Upload files**. Drag in `index.html`, `sw.js`, `foods.json` and the `art` folder (first time, and in V19:
+   also `manifest.json`, the three icons and `zxing.min.js`). **Commit changes**.
 3. First time only: **Settings → Pages → Deploy from a branch → main / (root) → Save**.
 4. A minute or two later it is live at `https://<your-github-name>.github.io/road-to-lean/`.
 
 ## 2. The Cloudflare Worker (the System)
 
-V18 changes `worker.js`: paste the new one into Cloudflare (Edit code → select all → paste → Deploy) and add the FatSecret secrets above. To check: open the app →
+V19 changes `worker.js`: paste the new one into Cloudflare (Edit code → select all → paste → Deploy), add the FatSecret secrets above if you haven't, and add the Cron Trigger for reminders. To check: open the app →
 ⚙️ → **Test connection**. If no line mentions "an older version", it is current.
 
 Setting it up from nothing:
@@ -102,7 +124,7 @@ Setting it up from nothing:
    `LIMIT_SCAN` (12), `LIMIT_LABEL` (30), `LIMIT_WEB` (8).
 4. **Storage for the cloud copy and Apple Health:** Workers & Pages → **KV** → **Create namespace** (any name). Then
    the Worker's **Settings → Bindings → Add → KV namespace** → variable name **`SYNC`** → pick the namespace → Deploy.
-5. Open `https://<your-worker-address>/health`. You should see `"ai":true,"auth":true,"kv":true,"version":4`.
+5. Open `https://<your-worker-address>/health`. You should see `"auth":true,"kv":true,"push":true,"version":6`.
 
 Set a monthly spend limit at console.anthropic.com. Each food log is one short Claude Haiku call.
 
@@ -114,7 +136,7 @@ Set a monthly spend limit at console.anthropic.com. Each food log is one short C
 3. ⚙️ → **Diagnostics**: every line should say PASS (two of them check today's character and all 85 pictures).
 
 **Updating an iPhone that already has the app:** open it with signal, wait ten seconds, close it fully (swipe it
-away), open it again. ⚙️ should now end with "Ascend V18 · data v10". Your logs are never removed by an update. v16 only adds to your save: a place for
+away), open it again. ⚙️ should now end with "Ascend V19 · data v10". For the new icon and name, delete the old Home Screen icon and add it again from Safari. Your logs are never removed by an update. v16 only adds to your save: a place for
 your profile picture, your theme, and the date Penalty Quests stopped.
 
 ## 4. On a laptop
