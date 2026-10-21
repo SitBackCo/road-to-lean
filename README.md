@@ -41,6 +41,11 @@ Cloudflare account and in the storage of the device you type them into.
 - **Bedtime 10–11pm:** the Lights out quest reads "In bed 10–11pm" (an old 9:45pm setting moves to it).
 - **FatSecret check:** ⚙️ → Test connection now says whether FatSecret really answers and, if not, shows the Worker's
   internet address to approve in FatSecret → IP Restrictions. Needs the new `worker.js` (version 7).
+- **Smoother opening and tabs (same quality):** the light rays, nebula, flashes and shock rings are drawn once and then
+  only faded, turned or scaled, so the phone never repaints the whole screen mid-scene; sparks are stamped from
+  ready-made glows; both cards are decoded before they turn over; each scene is timed to the screen's own frames; and
+  syncing, picture caching and the food list wait until the opening is over. Switching tabs builds the new page first
+  and brings the aura in one frame later, with a slightly quicker slide.
 
 ### New in V19
 

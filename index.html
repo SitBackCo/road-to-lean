@@ -1237,6 +1237,63 @@ html[data-theme="inferno"]{--night:#140705;--night-2:#22100a;--night-top:#1d0a06
 .bossicon,.node.next{position:relative;animation:none}
 .bossicon::after,.node.next::after{content:"";position:absolute;inset:-1px;border-radius:inherit;box-shadow:0 0 26px rgba(255,107,142,.5);opacity:0;animation:glowP 2.4s ease-in-out infinite;pointer-events:none;will-change:opacity}
 .node.next::after{box-shadow:0 0 14px var(--c);animation-duration:2s}
+
+/* ═════ VF smooth opening: the same look, drawn the cheap way ═════ */
+.iz-rays{width:120vmax;height:120vmax;margin:-60vmax 0 0 -60vmax;background:none;-webkit-mask-image:none;mask-image:none;will-change:transform,opacity}
+#splash.p-sae .iz-rays.iz-rays3{opacity:0;animation:none}
+#splash.p-reveal .iz-rays.iz-rays2{opacity:0;animation:raySpin 7s linear infinite reverse;transition:opacity .35s ease}
+#splash.p-reveal .iz-rays.iz-rays3{opacity:.85;animation:raySpin 14s linear infinite,rayFade 2.6s ease .4s forwards}
+#splash.p-dual .iz-rays.iz-rays3{opacity:0;animation:none}
+.ic,.iz-ring,.iz-flash{will-change:transform,opacity}
+/* the glow that brightens round a card is its own ready-drawn layer, faded in (no shadow redrawn mid-animation) */
+.ic-glow{position:absolute;inset:0;border-radius:calc(var(--cw)*.065);pointer-events:none;opacity:0;transform:translateZ(-1px);box-shadow:0 0 80px 14px rgba(var(--g),.85);transition:opacity .45s ease;will-change:opacity}
+.ic-natsu .ic-glow{box-shadow:0 0 90px 20px rgba(255,110,30,.95);transition-duration:.35s}
+#splash.p-sae .ic-sae .ic-glow{opacity:1}
+#splash.p-ignite .ic-natsu .ic-glow{opacity:1}
+#splash.p-sae .ic-sae .ic-front,#splash.p-ignite .ic-natsu .ic-front{box-shadow:0 0 0 1px rgba(0,0,0,.6),0 18px 50px rgba(0,0,0,.6),0 0 46px rgba(var(--g),.75)}
+/* the foil sweep: a plain bright band (no blending with what is under it) */
+.ic-foil{mix-blend-mode:normal;background:linear-gradient(90deg,transparent,rgba(255,255,255,.32),rgba(var(--g),.2),transparent);will-change:transform}
+/* ASCEND arrives by scaling and fading (the letters no longer re-space every frame) */
+#splash.intro .sp-t{letter-spacing:.22em;will-change:transform,opacity}
+#splash.intro .sp-logo{will-change:transform,opacity}
+#splash.p-reveal .sp-t{animation:rkTitle2 .8s cubic-bezier(.2,.9,.2,1) .3s forwards}
+@keyframes rkTitle2{0%{opacity:0;transform:scale(1.35)}100%{opacity:1;transform:none}}
+/* ═════ VF smooth tabs: the new screen slides in as one piece, quickly, and its cards follow with a short, light rise
+   (the same motion as before, in about half the time, so the frosted cards spend less time moving) ═════ */
+.view.on{animation-duration:.26s}
+.view.on.from-r,.view.on.from-l{animation-duration:.28s;animation-timing-function:cubic-bezier(.2,.8,.2,1)}
+.view.on>.win,.view.on>.plancard,.view.on>.win.duel.last{animation-name:frostInVF;animation-duration:.34s}
+.view.on>*:nth-child(2){animation-delay:.03s}.view.on>*:nth-child(3){animation-delay:.06s}.view.on>*:nth-child(4){animation-delay:.09s}.view.on>*:nth-child(n+5){animation-delay:.12s}
+@keyframes frostInVF{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+/* the nebula, the flashes and the shock rings: ready-drawn, each with its own fixed colour, so a new scene only fades
+   or scales them */
+.iz-neb i{background:none!important}
+.iz-neb canvas,.iz-flash .fl{position:absolute;inset:0;width:100%;height:100%;display:block}
+.iz-neb i{will-change:opacity}
+.iz-flash{background:none!important;animation:none!important;opacity:1!important;will-change:auto}
+.iz-flash .fl{opacity:0;will-change:opacity}
+#splash.p-swap .fl-a{animation:flashA .7s ease-out forwards}
+#splash.p-ignite .fl-i{animation:flashGlow .5s ease-in forwards}
+#splash.p-reveal .fl-i{animation:flashOff .35s ease-out forwards}
+#splash.p-reveal .fl-r{animation:flashA 1s ease-out forwards}
+#splash.p-dual .fl-d{animation:flashA .8s ease-out forwards}
+@keyframes flashOff{from{opacity:.75}to{opacity:0}}
+.zr{position:absolute;left:50%;top:var(--cy);width:70vmin;height:70vmin;margin:-35vmin 0 0 -35vmin;border-radius:50%;opacity:0;pointer-events:none;will-change:transform,opacity;
+  border:3px solid rgba(255,140,230,.9);box-shadow:0 0 30px rgba(255,70,210,.7),inset 0 0 30px rgba(255,70,210,.5)}
+.zr.ro1{border-color:rgba(255,170,70,.95);box-shadow:0 0 30px rgba(255,110,30,.8),inset 0 0 30px rgba(255,90,20,.6)}
+.zr.ro2{border-color:rgba(255,90,30,.9);box-shadow:0 0 30px rgba(230,40,20,.7)}
+.zr.rg1{border-color:rgba(255,226,140,1);box-shadow:0 0 40px rgba(255,200,90,.9),inset 0 0 40px rgba(255,140,40,.7)}
+.zr.rg2{border-color:rgba(255,120,40,.9);box-shadow:0 0 30px rgba(255,120,40,.6),inset 0 0 30px rgba(255,90,20,.4)}
+#splash.p-sae .zr.rp1{animation:ringA .9s ease-out forwards}
+#splash.p-sae .zr.rp2{animation:ringA 1.1s ease-out .15s forwards}
+#splash.p-swap .zr.rp1{animation:ringB .8s ease-out forwards}
+#splash.p-swap .zr.rp2{animation:none}
+#splash.p-natsu .zr.ro1{animation:ringC .9s ease-out forwards}
+#splash.p-natsu .zr.ro2{animation:ringC 1.1s ease-out .15s forwards}
+#splash.p-reveal .zr.rg1{animation:ringD 1s ease-out forwards}
+#splash.p-reveal .zr.rg2{animation:ringD 1.3s ease-out .12s forwards}
+#splash.p-dual .zr.rp1{animation:ringA .9s ease-out forwards}
+#splash.p-dual .zr.ro1{animation:ringC 1s ease-out .1s forwards}
 </style>
 </head>
 <body>
@@ -4802,7 +4859,7 @@ function init() {
          comes back, then carry on drawing as before */
       canvas.addEventListener('webglcontextlost', function (e) { e.preventDefault(); X.lost = true; stop(); X.wrap.classList.add('css'); });
       canvas.addEventListener('webglcontextrestored', function () {
-        try { setupGL(); X.lost = false; X.wrap.classList.remove('css'); if (X.img.complete && X.img.naturalWidth) { uploadChar(); X.cw = 0; resize(); } start(); } catch (e) { fail(e && e.message || e); }
+        try { setupGL(); X.lost = false; X.wrap.classList.remove('css'); if (X.img.complete && X.img.naturalWidth) { X.cw = 0; resize(); } start(); } catch (e) { fail(e && e.message || e); }
       });
     } catch (e) { X.gl = null; A.failed = true; A.error = String(e && e.message || e); if (X.canvas && X.canvas.parentNode) X.canvas.parentNode.removeChild(X.canvas); }
   }
@@ -4821,7 +4878,7 @@ function setupGL() {
   var buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
   var loc = gl.getAttribLocation(prog, 'aP'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
   X.u = {}; ['uChar', 'uMask', 'uRes', 'uRect', 'uCore', 'uT', 'uBoost', 'uMini', 'uDark', 'uBase', 'uLight', 'uDeep', 'uBolt', 'uHiA', 'uHiB'].forEach(function (k) { X.u[k] = gl.getUniformLocation(prog, k); });
-  X.texChar = mkTex(gl); X.texMask = mkTex(gl);
+  X.texChar = mkTex(gl); X.texMask = mkTex(gl); X.texCache = []; // (a new graphics context: nothing kept from before)
   gl.uniform1i(X.u.uChar, 0); gl.uniform1i(X.u.uMask, 1);
   gl.clearColor(0, 0, 0, 0); gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
 }
@@ -4904,6 +4961,16 @@ function uploadChar() {
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
 }
+/* VF: the character is kept on the graphics chip at each size it has been drawn (Home, Body, Aura), so moving between
+   tabs reuses it instead of shrinking and sending the picture again */
+function charTexture() {
+  var gl = X.gl; if (!gl || X.lost) return;
+  var key = X.n + '|' + X.src.length + '|' + X.src.slice(-32) + '|' + (X.cw && X.rect ? Math.ceil((X.rect[2] - X.rect[0]) * X.cw) : 0);
+  X.texCache = X.texCache || [];
+  for (var i = 0; i < X.texCache.length; i++) if (X.texCache[i].key === key) { X.texChar = X.texCache[i].tex; return; }
+  X.texChar = mkTex(gl); uploadChar(); X.texCache.unshift({ key: key, tex: X.texChar });
+  while (X.texCache.length > 3) { var old = X.texCache.pop(); if (old.tex !== X.texChar) gl.deleteTexture(old.tex); }
+}
 function resize() {
   if (!X || !X.wrap.isConnected) return;
   var w = X.wrap.clientWidth, h = X.wrap.clientHeight; if (!w || !h) return;
@@ -4912,7 +4979,7 @@ function resize() {
   var changed = W !== X.cw || H !== X.ch || X.lastMode !== X.mode;
   X.cw = W; X.ch = H; X.lastMode = X.mode;
   if (X.canvas && (X.canvas.width !== W || X.canvas.height !== H)) { X.canvas.width = W; X.canvas.height = H; }
-  if (changed && X.ready) { layout(); buildMask(); uploadChar(); }
+  if (changed && X.ready) { layout(); buildMask(); charTexture(); }
   if (X.ready) draw(now());
 }
 function now() { return ((root.performance || Date).now() - X.t0) / 1000; }
@@ -4967,7 +5034,7 @@ A.show = function (container, info, mode) {
     var img = X.img, want = info.src;
     img.onload = function () {
       if (X.src !== want) return;
-      try { if (X.gl) uploadChar(); X.ready = true; X.cw = 0; resize(); start(); } catch (e) { fail(e && e.message || e); }
+      try { X.ready = true; X.cw = 0; resize(); start(); } catch (e) { fail(e && e.message || e); }
     };
     img.onerror = function () { if (X.src === want) X.wrap.classList.add('missing'); };
     X.wrap.classList.remove('missing');
@@ -5148,8 +5215,10 @@ root.Puzzle = P;
 </script>
 <script>/* src/intro.js */
 /* Ascend opening: two playing cards. Sae Itoshi (pink aura) flips in first, then Natsu (fire), then Natsu's flames burst
-   into the Rank-up icon and ASCEND. VF: the full version plays every time the app opens; a tap skips it. Everything that moves is a transform or opacity (the phone's graphics chip does it), plus one
-   small canvas of sparks and embers that only runs while the intro is on screen. */
+   into the Rank-up icon and ASCEND. VF: the full version plays every time the app opens; a tap skips it.
+   Smooth on a phone: everything that moves is a transform or opacity (the graphics chip does it); the light rays are drawn
+   once and only turned; every glow that brightens is a ready-drawn layer that fades in; the sparks are stamped from
+   ready-made sprites; the scenes change on the screen's own frame clock; both pictures are decoded before they show. */
 (function () {
   'use strict';
   var KEY = 'ascend-intro-opens';
@@ -5165,12 +5234,41 @@ root.Puzzle = P;
 
   function card(id, src) {
     var c = CARDS[id], corner = '<div class="ic-idx"><b>' + c.rank + '</b>' + SUIT[id] + '</div>';
-    return '<div class="ic ic-' + id + '"><div class="ic-in">' +
+    return '<div class="ic ic-' + id + '"><div class="ic-in"><div class="ic-glow"></div>' +
       '<div class="ic-f ic-back"><div class="ic-pat"></div>' + BACK + '</div>' +
       '<div class="ic-f ic-front"><img alt="" decoding="async" src="' + src + '"><div class="ic-tint"></div><div class="ic-frame"></div>' +
       corner + corner.replace('ic-idx', 'ic-idx ic-idx2') +
       '<div class="ic-plate"><span>' + c.name + '</span><small>' + c.sub + '</small></div><div class="ic-foil"></div></div>' +
       '</div></div>';
+  }
+  /* the light rays, drawn once onto a canvas (19 soft rays fading out from the middle); the page only turns it */
+  function rays(cv, rgb) {
+    if (!cv) return; var g = cv.getContext('2d'), S = cv.width, c = S / 2, n = 19, step = Math.PI * 2 / n;
+    g.clearRect(0, 0, S, S);
+    for (var i = 0; i < n; i++) {
+      var a0 = i * step + step * 5 / 19, a1 = i * step + step * 12 / 19, am = i * step + step * 8 / 19;
+      for (var k = 0; k < 6; k++) { // a ray: brightest along its middle, soft at both edges
+        var f = k / 6, w0 = am - (am - a0) * (1 - f), w1 = am + (a1 - am) * (1 - f);
+        g.fillStyle = 'rgba(' + rgb + ',.085)'; g.beginPath(); g.moveTo(c, c); g.arc(c, c, c, w0, w1); g.closePath(); g.fill();
+      }
+    }
+    g.globalCompositeOperation = 'destination-in'; var fade = g.createRadialGradient(c, c, 0, c, c, c);
+    fade.addColorStop(0, 'rgba(0,0,0,1)'); fade.addColorStop(0.12, 'rgba(0,0,0,1)'); fade.addColorStop(0.40, 'rgba(0,0,0,.6)'); fade.addColorStop(0.92, 'rgba(0,0,0,0)'); fade.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = fade; g.fillRect(0, 0, S, S); g.globalCompositeOperation = 'source-over';
+  }
+  /* a soft glow drawn onto a small canvas the size of the screen × scale. Each spot: centre (x, y) and, for an oval, its
+     radii (rx, ry) as parts of the width and height; a round spot reaches the farthest corner, like CSS radial-gradient */
+  function glow(el, scale, spots) {
+    if (!el) return; var cv = el.tagName === 'CANVAS' ? el : el.appendChild(document.createElement('canvas'));
+    var W = Math.max(1, window.innerWidth), H = Math.max(1, window.innerHeight), w = Math.round(W * scale), h = Math.round(H * scale);
+    cv.width = w; cv.height = h; var g = cv.getContext('2d');
+    spots.forEach(function (sp) {
+      var cx = sp.x * w, cy = sp.y * h, rx, ry;
+      if (sp.rx) { rx = sp.rx * w; ry = sp.ry * h; } else { var dx = Math.max(cx, w - cx), dy = Math.max(cy, h - cy); rx = ry = Math.sqrt(dx * dx + dy * dy); }
+      g.save(); g.setTransform(rx, 0, 0, ry, cx, cy); var gr = g.createRadialGradient(0, 0, 0, 0, 0, 1);
+      sp.st.forEach(function (x) { gr.addColorStop(x[0], 'rgba(' + x[1] + ')'); });
+      g.fillStyle = gr; g.fillRect(-cx / rx, -cy / ry, w / rx, h / ry); g.restore();
+    });
   }
   function opens() { try { return +localStorage.getItem(KEY) || 0; } catch (e) { return 0; } }
   function count() { try { localStorage.setItem(KEY, String(opens() + 1)); } catch (e) {} }
@@ -5181,10 +5279,21 @@ root.Puzzle = P;
     function size() { W = cv.clientWidth; H = cv.clientHeight; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
     size();
     var PAL = { sae: ['255,64,200', '255,120,230', '255,200,250', '200,60,255'], fire: ['255,90,20', '255,150,40', '255,220,120', '230,40,20'], gold: ['255,226,140', '255,170,60', '255,255,230'] };
+    // one soft glowing dot per colour, drawn once; every spark after that is a quick stamp of it
+    var SPR = {};
+    function sprite(c) {
+      if (SPR[c]) return SPR[c];
+      var s = document.createElement('canvas'); s.width = s.height = 64; var g = s.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+      gr.addColorStop(0, 'rgba(' + c + ',1)'); gr.addColorStop(1, 'rgba(' + c + ',0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+      return (SPR[c] = s);
+    }
+    Object.keys(PAL).forEach(function (k) { PAL[k].forEach(sprite); });
     function add(x, y, vx, vy, life, r, col, kind) { if (P.length > 420) return; P.push({ x: x, y: y, vx: vx, vy: vy, life: life, max: life, r: r, c: col, k: kind || 0, w: Math.random() * 6.28 }); }
     function pick(p) { var a = PAL[p]; return a[(Math.random() * a.length) | 0]; }
+    var ticks = [];
     function frame(t) {
       if (!on) return; raf = requestAnimationFrame(frame);
+      for (var q = 0; q < ticks.length; q++) ticks[q](t);
       var dt = Math.min(0.05, last ? (t - last) / 1000 : 0.016); last = t;
       if (Math.abs(cv.clientWidth - W) > 1) size();
       emit.forEach(function (e) {
@@ -5204,7 +5313,7 @@ root.Puzzle = P;
         p.x += (p.vx + Math.sin(p.w) * (p.k === 1 ? 26 : 14)) * dt; p.y += p.vy * dt; p.vx *= 0.985; p.vy *= p.k === 3 ? 0.94 : 0.995;
         var r = p.r * (p.k === 1 ? (0.4 + k * 0.9) : (0.5 + k * 0.5));
         ctx.globalAlpha = Math.min(1, k * 1.6);
-        if (p.k === 1 || p.k === 3) { var g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 2.4); g.addColorStop(0, 'rgba(' + p.c + ',1)'); g.addColorStop(1, 'rgba(' + p.c + ',0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, r * 2.4, 0, 6.283); ctx.fill(); }
+        if (p.k === 1 || p.k === 3) { var R2 = r * 2.4; ctx.drawImage(sprite(p.c), p.x - R2, p.y - R2, R2 * 2, R2 * 2); }
         else { ctx.fillStyle = 'rgba(' + p.c + ',1)'; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 6.283); ctx.fill(); if (p.k === 2 && k > 0.5) { ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.45, 0, 6.283); ctx.fill(); } }
       }
       ctx.globalAlpha = 1;
@@ -5217,25 +5326,46 @@ root.Puzzle = P;
         var cx = W / 2, cy = H * 0.46;
         for (var i = 0; i < n; i++) { var a = Math.random() * 6.283, s = speed * (0.35 + Math.random() * 0.9); add(cx, cy, Math.cos(a) * s, Math.sin(a) * s, 0.45 + Math.random() * 0.7, pal === 'fire' ? 1.5 + Math.random() * 3.5 : 1.5 + Math.random() * 3.5, pick(pal), pal === 'fire' && i % 3 === 0 ? 3 : 2); }
       },
+      onFrame: function (f) { ticks.push(f); },
       end: function () { on = false; cancelAnimationFrame(raf); P = []; }
     };
   }
 
-  /* play(splash, { art: {sae, natsu}, onDone }) → { skip() }. mode: full on the first 3 opens on this device, then short */
+  /* play(splash, { art: {sae, natsu}, onDone, short }) → { skip(), end() } */
   function play(sp, o) {
     o = o || {};
     var full = o.short !== true; count(); // VF: the full intro every time (the short one only if asked for)
     var art = o.art || {};
     // the stage: a nebula of both colours, the canvas, two cards, aura rays, shock rings and a flash
     var z = document.createElement('div'); z.className = 'iz'; z.setAttribute('aria-hidden', 'true');
-    z.innerHTML = '<div class="iz-neb"><i></i><i></i><i></i></div><div class="iz-rays"></div><div class="iz-rays iz-rays2"></div>' +
+    z.innerHTML = '<div class="iz-neb"><i></i><i></i><i></i></div><canvas class="iz-rays" width="1024" height="1024"></canvas><canvas class="iz-rays iz-rays2" width="1024" height="1024"></canvas><canvas class="iz-rays iz-rays3" width="1024" height="1024"></canvas>' +
       '<canvas class="iz-fx"></canvas><div class="iz-stage">' + card('sae', art.sae || '') + card('natsu', art.natsu || '') + '</div>' +
-      '<div class="iz-ring"></div><div class="iz-ring iz-ring2"></div><div class="iz-flash"></div>';
+      '<div class="zr rp1"></div><div class="zr rp2"></div><div class="zr ro1"></div><div class="zr ro2"></div><div class="zr rg1"></div><div class="zr rg2"></div>' +
+      '<div class="iz-flash"><canvas class="fl fl-a"></canvas><canvas class="fl fl-i"></canvas><canvas class="fl fl-r"></canvas><canvas class="fl fl-d"></canvas></div>';
     sp.insertBefore(z, sp.firstChild);
+    [['', '255,70,210'], ['2', '255,120,30'], ['3', '255,200,90']].forEach(function (r) { try { rays(z.querySelector('.iz-rays' + (r[0] ? '.iz-rays' + r[0] : ':not(.iz-rays2):not(.iz-rays3)')), r[1]); } catch (e) {} });
+    // the soft glows (the nebula behind, and the four flashes) are drawn once at the start onto small canvases, which the
+    // page only fades: a smooth gradient looks exactly the same drawn small and stretched, and nothing is redrawn mid-scene
+    try {
+      var nb = z.querySelectorAll('.iz-neb i');
+      glow(nb[0], 0.5, [{ x: .26, y: .30, rx: .55, ry: .40, st: [[0, '255,50,190,.55'], [.7, '255,50,190,0']] }]);
+      glow(nb[1], 0.5, [{ x: .76, y: .70, rx: .60, ry: .45, st: [[0, '255,96,20,.55'], [.7, '255,96,20,0']] }]);
+      glow(nb[2], 0.5, [{ x: .50, y: .46, rx: .45, ry: .30, st: [[0, '150,40,255,.35'], [.7, '150,40,255,0']] }]);
+      glow(z.querySelector('.fl-a'), 0.6, [{ x: .5, y: .46, st: [[0, '255,255,255,1'], [.18, '255,180,240,.9'], [.40, '255,60,200,.5'], [.75, '255,60,200,0']] }]);
+      glow(z.querySelector('.fl-i'), 0.6, [{ x: .5, y: .46, st: [[0, '255,230,160,.9'], [.30, '255,110,30,.6'], [.55, '200,30,10,.35'], [.80, '200,30,10,0']] }]);
+      glow(z.querySelector('.fl-r'), 0.6, [{ x: .5, y: .46, st: [[0, '255,255,255,1'], [.20, '255,230,160,.95'], [.42, '255,110,30,.6'], [.78, '255,110,30,0']] }]);
+      glow(z.querySelector('.fl-d'), 0.6, [{ x: .3, y: .46, st: [[0, '255,80,210,.6'], [.45, '255,80,210,0']] }, { x: .7, y: .46, st: [[0, '255,120,30,.6'], [.45, '255,120,30,0']] }]);
+    } catch (e) {}
+    // decode both pictures now, so a card never stalls the moment it turns face up
+    [].forEach.call(z.querySelectorAll('.ic-front img'), function (im) { if (im.decode) im.decode().catch(function () {}); });
     sp.classList.add('intro', full ? 'full' : 'short');
     var fx = null; try { fx = Fx(z.querySelector('.iz-fx')); } catch (e) {}
+    if (fx) fx.onFrame(function (t) { var el = t - t0; for (var i = 0; i < due.length; i++) if (!due[i].ran && el >= due[i].ms) run(due[i]); });
     var timers = [], done = false;
-    function at(ms, f) { timers.push(setTimeout(function () { if (!done) { try { f(); } catch (e) {} } }, ms)); }
+    // the scenes change on the screen's frame clock (a timer can fire mid-frame); a timer backs it up if frames stop
+    var t0 = performance.now(), due = [];
+    function at(ms, f) { var job = { ms: ms, f: f, ran: false }; due.push(job); timers.push(setTimeout(function () { run(job); }, ms + 120)); }
+    function run(job) { if (job.ran || done) return; job.ran = true; try { job.f(); } catch (e) {} }
     function ph(c) { sp.classList.add(c); }
     function cw() { var c = z.querySelector('.ic'); return c ? c.getBoundingClientRect() : { width: 260, height: 364 }; }
     var total;
@@ -5679,7 +5809,10 @@ function render(dir) {
   snowCtl();
   RENDERERS = RENDERERS || { status: renderStatus, quests: renderQuests, log: renderLog, body: renderBody, stats: renderStats, aura: renderAura, bosses: renderBosses, armoury: renderArmoury };
   try { RENDERERS[tab](); } catch (e) { reportErr(e, 'screen ' + tab); var v = $('#v-' + tab); if (v) { v.innerHTML = failCard('THIS SCREEN'); v._html = null; } }
-  try { mountAura(); } catch (e2) { reportErr(e2, 'aura'); }
+  // VF: on a tab switch the new screen shows first; the character moves into it on the next frame (measuring the screen
+  // straight away would hold up that first frame)
+  if (dir) { var at = tab; requestAnimationFrame(function () { requestAnimationFrame(function () { if (tab === at) { try { mountAura(); } catch (e3) { reportErr(e3, 'aura'); } } }); }); }
+  else { try { mountAura(); } catch (e2) { reportErr(e2, 'aura'); } }
 }
 function setTab(t) { if (t === tab || TAB_ORDER.indexOf(t) < 0) return; var dir = TAB_ORDER.indexOf(t) - TAB_ORDER.indexOf(tab); tab = t; if (t !== 'log') viewDay = null; render(dir); window.scrollTo(0, 0); }
 
@@ -7642,7 +7775,7 @@ function boot() {
     function () { var q = R.questStatus(S, today()); lastQuestDone = {}; q.forEach(function (x) { lastQuestDone[x.id] = x.done; }); },
     function () { render(); }
   ].forEach(function (step, i) { try { step(); } catch (e) { reportErr(e, 'opening step ' + (i + 1)); } });
-  setTimeout(function () { syncCheck(false); }, 900);
+  afterSplash(function () { syncCheck(false); }, 900); // VF: once the opening is over, so it has the phone to itself
   var sp = $('#splash'), gone = false;
   try { var spd = sp && $('.sp-s', sp); if (spd) spd.textContent = (R.fmtDate(S.profile.startDate).slice(4) + ' – ' + R.fmtDate(S.profile.seasonEnd).slice(4)).toUpperCase(); } catch (e) {} // the dates on the opening screen are the arc's real ones
   var imp = null; try { imp = R.parseImportQuery(location.search); } catch (e) {}
@@ -7650,13 +7783,15 @@ function boot() {
   var doParam = (/[?&]do=(water|log)/.exec(location.search) || [])[0] || '';
   if (doParam) { try { history.replaceState(null, '', location.pathname); } catch (e) {} }
   function afterIntro() { if (doParam) setTimeout(function () { notifyOpen(doParam); }, 500); try { showNotice(); } catch (e) { reportErr(e, 'daily notice'); } try { restartNote(); } catch (e) { reportErr(e, 'restart note'); } setTimeout(maybeBossIntro, 900); setTimeout(maybeHeroReveal, 1600); if (imp) { if (!imp.date) imp.date = today(); setTimeout(function () { scanForm(imp, { banner: 'Body data from your iPhone Shortcut. Check it, then save.' }); }, 300); } setTimeout(function () { checkInbox(); }, 1200); }
-  function hideSplash() { if (gone) return; gone = true; sp.classList.add('out'); if (window.Aura) window.Aura.pause(false); setTimeout(function () { sp.remove(); afterIntro(); }, 650); }
-  if (!sp) { gone = true; setTimeout(afterIntro, 200); }
-  else if (!S.settings.splash || calm() || /[?&]nosplash/.test(location.search) || imp || doParam) { sp.remove(); gone = true; setTimeout(afterIntro, 200); }
+  // VF: the character's aura and the puzzle pieces start again only once the opening has faded away, so the fade is smooth
+  function hideSplash() { if (gone) return; gone = true; sp.classList.add('out'); setTimeout(function () { sp.remove(); if (window.Aura) window.Aura.pause(false); if (window.Puzzle) window.Puzzle.hold(false); splashDone(); afterIntro(); }, 650); }
+  setTimeout(function () { if (window.Aura) window.Aura.pause(false); splashDone(); }, 15000); // a safety net: never wait longer than this
+  if (!sp) { gone = true; splashDone(); setTimeout(afterIntro, 200); }
+  else if (!S.settings.splash || calm() || /[?&]nosplash/.test(location.search) || imp || doParam) { sp.remove(); gone = true; splashDone(); setTimeout(afterIntro, 200); }
   else {
     // Ascend: the card intro (full on the first three opens on this device, short after that); a tap skips it
     var intro = null;
-    if (window.Aura) window.Aura.pause(true); // the character's aura waits for the opening to finish
+    if (window.Aura) window.Aura.pause(true); if (window.Puzzle) window.Puzzle.hold(true); // they wait for the opening to finish
     try { if (window.AscendIntro) intro = window.AscendIntro.play(sp, { art: { sae: artSrc('art/x/sae.webp'), natsu: artSrc('art/x/natsu.webp') }, onDone: hideSplash }); } catch (e) { reportErr(e, 'opening'); }
     var skip = function () { if (intro) intro.end(); hideSplash(); };
     sp.addEventListener('click', skip); sp.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') skip(); });
@@ -7670,6 +7805,10 @@ function boot() {
 }
 window.RTLApp = { get state() { return S; }, builtinCount: function () { return builtin().length; }, loadGeneric: function () { return loadGeneric(); }, precacheArt: function () { precacheArt(); }, luckPop: function () { luckPop(); }, maybeBossIntro: function () { maybeBossIntro(); }, maybeHeroReveal: function () { maybeHeroReveal(); }, syncCheck: syncCheck, syncInfo: syncInfo, runDiagnostics: runDiagnostics, submitText: submitText, setTab: setTab, openCmd: openCmd, checkInbox: checkInbox, render: render, aura: function () { return window.Aura ? window.Aura.debug() : null; }, auraToday: function () { return auraNow(); }, get errors() { return errLog.slice(); } };
 /* ───────────── puzzle pieces (Blue Lock): a few drift up all the time, a burst from every tap ───────────── */
+/* VF: background work (sync, the food list, fetching pictures) waits until the opening is over */
+var splashGone = false, splashWaiters = [];
+function afterSplash(fn, ms) { if (splashGone) setTimeout(fn, ms); else splashWaiters.push([fn, ms]); }
+function splashDone() { if (splashGone) return; splashGone = true; splashWaiters.splice(0).forEach(function (w) { setTimeout(w[0], w[1]); }); }
 function snowCtl() { if (!window.Puzzle) return; window.Puzzle.calm = calm(); window.Puzzle.setAmbient(S.settings.snow !== false && !calm()); }
 if (window.Puzzle) window.Puzzle.init(document.getElementById('fx'));
 document.addEventListener('pointerdown', function (e) {
@@ -7689,8 +7828,8 @@ function precacheArt() {
     (function next() { if (i >= todo.length || document.hidden) return; var batch = todo.slice(i, i + 4); i += 4; Promise.all(batch.map(function (u) { return fetch(u).catch(function () {}); })).then(function () { setTimeout(next, 200); }); })();
   }).catch(function () {});
 }
-setTimeout(precacheArt, 6000);
-setTimeout(loadGeneric, 2500); // the built-in food list, fetched once in the background and then kept offline
+afterSplash(precacheArt, 6000);
+afterSplash(loadGeneric, 2500); // the built-in food list, fetched once in the background and then kept offline
 })();
 
 </script>
