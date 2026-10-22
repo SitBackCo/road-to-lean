@@ -39,6 +39,14 @@ for (const w of wanted) {
   if (fs.existsSync(th)) { const tbuf = fs.readFileSync(th), tout = path.join(ROOT, 'art', 't', w + '.webp'); fs.mkdirSync(path.dirname(tout), { recursive: true }); fs.writeFileSync(tout, tbuf); thumbCount++;
     artFiles['art/t/' + w + '.webp'] = 'art/t/' + w + '.webp?v=' + crypto.createHash('sha256').update(tbuf).digest('hex').slice(0, 10); }
 }
+// V21: the opening as a video (media/, made by tools/record-intro.mjs and tools/encode-intro.sh): HEVC for iPhones, H.264 for
+// anything that cannot play HEVC. Only the GitHub app has it; the page inside Claude keeps the live opening.
+let videoCount = 0;
+for (const [k, f] of [['art/intro/hevc.mp4', 'media/intro-hevc.mp4'], ['art/intro/h264.mp4', 'media/intro-h264.mp4']]) {
+  const src = path.join(ROOT, f); if (!fs.existsSync(src)) continue;
+  const vbuf = fs.readFileSync(src), out = path.join(ROOT, k); fs.mkdirSync(path.dirname(out), { recursive: true }); fs.writeFileSync(out, vbuf); videoCount++;
+  artFiles[k] = k + '?v=' + crypto.createHash('sha256').update(vbuf).digest('hex').slice(0, 10);
+}
 const counts = ['b', 'w', 'h', 'p', 'a'].map(d => Object.keys(art).filter(k => k.indexOf('art/' + d + '/') === 0).length);
 if (counts.join() !== [CORE.DUELS.length, CORE.DUELS.length, 11, 11, 85].join() || CORE.AURA.length !== 85) throw new Error('Pictures do not match the boss, hero and character lists: ' + counts.join());
 
@@ -123,4 +131,4 @@ fs.mkdirSync(path.join(ROOT, 'hosted'), { recursive: true });
 fs.writeFileSync(path.join(ROOT, 'hosted', 'winter-arc.html'), hosted.replace(/\s*$/, '\n'));
 
 const kb = f => Math.round(fs.statSync(path.join(ROOT, f)).size / 1024);
-console.log('index.html ' + kb('index.html') + ' KB (+ ' + (Object.keys(artFiles).length - thumbCount) + ' pictures in art/, ' + hdCount + ' in high resolution, ' + thumbCount + ' grid-sized copies) · ' + chains.length + ' chains (' + chains.reduce((a, c) => a + c.rows.length, 0) + ' items) · foods.json ' + kb('foods.json') + ' KB (' + generic.rows.length + ' generic + ' + mfp.length + ' MyFitnessPal foods) · hosted/winter-arc.html ' + kb('hosted/winter-arc.html') + ' KB · ' + Object.keys(art).length + ' pictures');
+console.log('index.html ' + kb('index.html') + ' KB (+ ' + (Object.keys(artFiles).length - thumbCount - videoCount) + ' pictures in art/, ' + hdCount + ' in high resolution, ' + thumbCount + ' grid-sized copies, ' + videoCount + ' opening videos) · ' + chains.length + ' chains (' + chains.reduce((a, c) => a + c.rows.length, 0) + ' items) · foods.json ' + kb('foods.json') + ' KB (' + generic.rows.length + ' generic + ' + mfp.length + ' MyFitnessPal foods) · hosted/winter-arc.html ' + kb('hosted/winter-arc.html') + ' KB · ' + Object.keys(art).length + ' pictures');

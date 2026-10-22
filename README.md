@@ -28,12 +28,23 @@ goal of **79kg**.
 No key, passcode or Worker address is written anywhere in this folder or in the page. They live only in your
 Cloudflare account and in the storage of the device you type them into.
 
+### V21
+
+- **The opening is a video.** The live opening is recorded frame by frame at the iPhone's full resolution, 60 frames a
+  second (`tools/record-intro.mjs`, `tools/encode-intro.sh`, files in `media/`), and the app plays it with the phone's
+  video chip, so it is smooth every time. HEVC for iPhones, H.264 as a spare; the phone keeps the one it plays. If it
+  cannot play (Low Power Mode, or the first open after an update before it has downloaded) the live opening runs instead.
+  The page inside Claude keeps the live opening.
+- **Heroes, hero powers and weapons are your original pictures again**, with no AI. Their Armoury tiles stay filled:
+  the whole picture on a blurred copy of itself, made from the original by plain resizing.
+- The version label reads V21.
+
 ### VF, update 2
 
 - **Weapon, power and hero pictures:** every Armoury tile is now filled. Pictures that are not square sit whole and sharp
   on a blurred, darkened copy of themselves instead of floating in black bars (made at build time by `tools/frame.py`,
   so it costs the phone nothing). The weapon, power and hero sheets do the same. Heroes and hero powers are AI-upscaled
-  four times (capped at 1,440px) and weapons three times, the same way as the aura characters (`art_uhd/`).
+  four times (capped at 1,440px) and weapons three times, the same way as the aura characters (`art_uhd/`). V21 went back to the original pictures.
 - **Opening:** the Bible verse is gone from the end (it could not be read in time); the Rank-up icon is bigger and sits
   exactly in the middle of the screen, where the rays and rings burst from. The first card now waits for its picture
   and for the app to finish starting behind it, so it flies in without a stutter.

@@ -38,6 +38,7 @@ self.addEventListener('fetch', e => {
     e.respondWith(caches.open(VERSION).then(c => c.match(PAGE)).then(hit => hit || fresh));
     return;
   }
+  if (sameOrigin && req.headers.has('range')) return; // a video asking for part of its file: straight to the network, which answers parts properly
   if (sameOrigin && (url.pathname.includes('/art/') || url.pathname.endsWith('/foods.json'))) { // every picture and the built-in food list: kept on the device once fetched, across app updates (each address names its own version)
     e.respondWith(caches.open(ART).then(c => c.match(req).then(hit => hit || fetch(req).then(r => { if (r && r.ok) c.put(req, r.clone()); return r; }))));
     return;
