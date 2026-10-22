@@ -28,6 +28,20 @@ goal of **79kg**.
 No key, passcode or Worker address is written anywhere in this folder or in the page. They live only in your
 Cloudflare account and in the storage of the device you type them into.
 
+### VF, update 2
+
+- **Weapon, power and hero pictures:** every Armoury tile is now filled. Pictures that are not square sit whole and sharp
+  on a blurred, darkened copy of themselves instead of floating in black bars (made at build time by `tools/frame.py`,
+  so it costs the phone nothing). The weapon, power and hero sheets do the same. Heroes and hero powers are AI-upscaled
+  four times (capped at 1,440px) and weapons three times, the same way as the aura characters (`art_uhd/`).
+- **Opening:** the Bible verse is gone from the end (it could not be read in time); the Rank-up icon is bigger and sits
+  exactly in the middle of the screen, where the rays and rings burst from. The first card now waits for its picture
+  and for the app to finish starting behind it, so it flies in without a stutter.
+- **Gym-only challenges:** a boss challenge that needs a pull-up bar (Dead hang, Lat activation) is only set on a gym day.
+  On a rest or football day the same boss asks for the home version instead (Farmer carry, Doorway rows).
+- **Armoury:** the tiles come in blocks of eight and a block off screen is not drawn until you scroll to it, so the tab
+  opens and scrolls more lightly. Nothing about the look changed.
+
 ### New in VF (the final version)
 
 - **The full opening every time** (it no longer shortens after a few opens), and the character's aura waits for it to
